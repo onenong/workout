@@ -1,29 +1,25 @@
-# 오버로드 로그
-
-점진적 과부하 운동 기록 앱이에요. 서버 없이 폰에 설치해서 쓰는 웹앱(PWA)이고, 한 번 열어 두면 인터넷이 없어도 돼요.
-
-- **운동**: 루틴을 만들고 세트마다 무게·횟수를 기록해요. 지난 기록을 보고 다음 목표(+1회, 증량, 디로드)를 자동으로 채워 줘요.
-- **단백질**: 몸무게로 하루 목표를 계산하고, 음식·단백질 음료·파우더 72종을 골라 넣으면 자동으로 합산해요.
-- **기록**: 캘린더에서 날짜를 누르면 그날 한 운동을 자세히 볼 수 있어요.
-- **성장**: 운동별 추정 1RM·횟수 그래프와 체성분 변화를 보여 줘요.
-- **코치**: 내 루틴으로 이번 주 근육별 세트를 보여 주고, 일주일마다 정체된 운동을 찾아 조정을 제안해요.
-
-## 폰에 설치하기
-
-- **아이폰**: Safari로 앱 주소를 열고 → 공유 버튼 → **홈 화면에 추가**
-- **안드로이드**: Chrome으로 앱 주소를 열고 → 메뉴(⋮) → **앱 설치** 또는 **홈 화면에 추가**
-
-## 데이터
-
-- 기록은 폰 안에만 저장돼요. 서버로 보내지 않아요.
-- 폰을 바꾸거나 앱을 지우면 기록이 사라지니, 가끔 **설정 → JSON 내보내기**로 백업해 두세요.
-- 백업 파일은 **설정 → JSON 가져오기**로 되돌릴 수 있어요. Claude에서 쓰던 기록도 같은 방법으로 옮겨요.
-
-## 업데이트
-
-인터넷이 연결된 상태로 앱을 열면 새 버전을 받아요.
-
-## 출처
-
-- 음식 단백질: 식약처 식품성분 DB, 대한당뇨병학회 식품교환표(2010), ProteinLab 단백질 음료 DB(2026년 11월 확인), 제품 영양 정보
-- 운동 기준: 앱의 코치 탭 → 근거 논문 11편
+// 오버로드 로그 서비스 워커 · d3dafdd528
+const SHELL = 'overload-shell-d3dafdd528', FONTS = 'overload-fonts';
+const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => Promise.all(ASSETS.map(a => c.add(a).catch(() => {}))) ).then(() => self.skipWaiting())); });
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== SHELL && k !== FONTS).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+});
+self.addEventListener('fetch', e => {
+  const req = e.request; if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  // 화면: 온라인이면 새 버전, 오프라인이면 저장해 둔 버전
+  if (req.mode === 'navigate') {
+    e.respondWith(fetch(req).then(res => { const copy = res.clone(); caches.open(SHELL).then(c => c.put('./index.html', copy)); return res; }).catch(() => caches.match('./index.html')));
+    return;
+  }
+  // 글꼴: 저장본을 먼저 쓰고 뒤에서 갱신
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+    e.respondWith(caches.open(FONTS).then(c => c.match(req).then(hit => {
+      const net = fetch(req).then(res => { if (res.ok || res.type === 'opaque') c.put(req, res.clone()); return res; }).catch(() => hit);
+      return hit || net;
+    })));
+    return;
+  }
+  if (url.origin === location.origin) e.respondWith(caches.match(req, { ignoreSearch: true }).then(hit => hit || fetch(req)));
+});
