@@ -1,6 +1,6 @@
 {
-  "name": "오버로드 로그",
-  "short_name": "오버로드",
+  "name": "WORKOUT",
+  "short_name": "WORKOUT",
   "description": "점진적 과부하 운동 기록 · 단백질 계산",
   "lang": "ko",
   "start_url": "./",

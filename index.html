@@ -8,13 +8,13 @@
 <meta name="description" content="점진적 과부하 운동 기록 · 단백질 계산">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="오버로드">
+<meta name="apple-mobile-web-app-title" content="WORKOUT">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>html,body{margin:0}</style>
-<title>오버로드 로그</title>
+<title>WORKOUT</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
@@ -489,7 +489,7 @@ button.notice{cursor:pointer}
 <body>
 <header class="top" id="top">
   <div class="wrap">
-    <div class="brand"><b>오버로드 로그</b><span>Progressive overload</span></div>
+    <div class="brand"><b>WORKOUT</b><span>Progressive overload</span></div>
     <span class="sync" id="sync" data-s="loading"><i></i><span id="sync-t">불러오는 중</span></span>
     <button class="icon-btn" type="button" data-act="settings" data-icon="gear" aria-label="설정"></button>
   </div>
@@ -1848,7 +1848,7 @@ function saveXs() {
 async function exportData() {
   const payload = { app: 'overload-log', version: 4, exportedAt: new Date().toISOString(), exercises: state.exercises, routines: state.routines, settings: state.settings, profile: state.profile, body: state.body, coach: state.coach, nutri: state.nutri, protein: state.pmonths, sessions: sessions().slice().reverse() };
   const json = JSON.stringify(payload, null, 2);
-  const d = new Date(), filename = 'overload-log-' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '.json';
+  const d = new Date(), filename = 'workout-' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '.json';
   let dl = null;
   try { const c = window.claude; dl = c && typeof c.use === 'function' ? await c.use('downloads') : null; } catch (e) { dl = null; }
   if (!dl) { if (!window.claude && blobDownload(filename, json)) return; exportFallback(json); return; }
@@ -2610,7 +2610,7 @@ boot();
 
 <script>
 // 오프라인 사용을 위한 서비스 워커와, 기기 저장 공간이 지워지지 않도록 요청
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=adbe1857fc').catch(() => {}));
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=4ed2ab2c1c').catch(() => {}));
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 </script>
 </body>
