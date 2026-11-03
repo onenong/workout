@@ -2610,7 +2610,7 @@ boot();
 
 <script>
 // 오프라인 사용을 위한 서비스 워커와, 기기 저장 공간이 지워지지 않도록 요청
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=4ed2ab2c1c').catch(() => {}));
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=ec94b6e309').catch(() => {}));
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 </script>
 </body>
