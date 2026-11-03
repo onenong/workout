@@ -242,6 +242,10 @@ body.has-rest main.wrap{padding-bottom:calc(var(--tabbar-h) + 112px)}
 .log-b header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
 .log-b h3{font:700 16px/1.35 var(--f-body);overflow-wrap:anywhere}
 .log-b header p{font-size:12.5px;margin-top:1px}
+.log-b header .acts{display:flex;flex:none;margin:-4px -6px 0 0}
+.se-list{margin:16px 0 12px}
+.se-type{margin-left:8px;font:600 11.5px/1 var(--f-body);color:var(--ink-3);vertical-align:2px}
+.se-note{margin:12px 2px 0;font-size:12.5px;color:var(--ink-2)}
 .lines{list-style:none;padding:0;display:grid;gap:4px;margin-top:9px}
 .lines li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:13.5px}
 .ln{min-width:0;overflow-wrap:anywhere}
@@ -566,6 +570,7 @@ const ICON = {
   check: ic('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
   x: ic('<path d="M7 7l10 10M17 7L7 17"/>'),
   trash: ic('<path d="M5 7h14M10 7V4.5h4V7M7 7l.8 12.5h8.4L17 7"/>'),
+  edit: ic('<path d="M4.5 19.5h4l10-10-4-4-10 10z"/><path d="M13 7l4 4"/>'),
   up: ic('<path d="M12 18V6.5M7 11.5l5-5 5 5"/>'),
   down: ic('<path d="M12 6v11.5M7 12.5l5 5 5-5"/>'),
   coach: ic('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>'),
@@ -695,7 +700,7 @@ const DEFAULT_NUTRI = { factor: 1.6, target: null, custom: [] };
 /* ── 상태 ─────────────────────────────────────── */
 const state = { exercises: [], routines: [], settings: Object.assign({}, DEFAULT_SETTINGS), months: {}, live: null, profile: clone(DEFAULT_PROFILE), body: [], coach: null, nutri: clone(DEFAULT_NUTRI), pmonths: {} };
 const ui = { tab: 'workout', ready: false, slow: false, loadErr: null, writeErr: false, sync: 'loading', progEx: null, metric: null, addEx: false, addExName: '', addExType: 'weight', sheet: null, chart: null, xs: null, calMonth: null, calDay: null, bd: null,
-  pday: null, pcat: null, pq: '', pmore: false, pa: null, pc: null, pk: null, pt: null };
+  pday: null, pcat: null, pq: '', pmore: false, pa: null, pc: null, pk: null, pt: null, se: null };
 const store = { mode: 'loading', db: null, uid: null };
 let edit = null;
 
@@ -1224,7 +1229,8 @@ function logItem(s) {
   if (st.vol) meta.push('볼륨 ' + fmtK(st.vol) + 'kg');
   return '<article class="log"><div class="log-d"><b>' + d.getDate() + '</b><span>' + DOW[d.getDay()] + '</span></div><div class="log-b">' +
     '<header><div><h3>' + esc(s.routineName || '자유 운동') + '</h3><p class="muted">' + meta.join(' · ') + '</p></div>' +
-    '<button class="icon-btn sm ghost" type="button" data-act="delsess" data-id="' + esc(s.id) + '" aria-label="' + md(s.start) + ' ' + esc(s.routineName || '운동') + ' 기록 지우기">' + ICON.trash + '</button></header>' +
+    '<div class="acts"><button class="icon-btn sm ghost" type="button" data-act="sess-edit" data-id="' + esc(s.id) + '" aria-label="' + md(s.start) + ' ' + esc(s.routineName || '운동') + ' 기록 고치기">' + ICON.edit + '</button>' +
+    '<button class="icon-btn sm ghost" type="button" data-act="delsess" data-id="' + esc(s.id) + '" aria-label="' + md(s.start) + ' ' + esc(s.routineName || '운동') + ' 기록 지우기">' + ICON.trash + '</button></div></header>' +
     '<ul class="lines">' + lines + '</ul>' + (prs ? '<div class="prs">' + prs + '</div>' : '') + '</div></article>';
 }
 
@@ -1516,6 +1522,105 @@ async function discard() {
   if (L.entries.some(e => e.sets.some(s => s.done)) && !(await ask('완료한 세트까지 모두 지우고 이번 운동을 취소할까요?', '취소하고 지우기', '계속 운동'))) return;
   endLive();
 }
+/* ── 지난 기록 고치기 ─────────────────────────── */
+// 최고 기록(PR)은 그때까지의 기록과 비교해 정해지므로, 기록을 고치면 처음부터 다시 계산
+function recomputePRs() {
+  const seen = new Map(), changed = new Set();
+  for (const s of sessions().slice().reverse()) {
+    const prs = [];
+    for (const e of s.entries) prs.push(...findPRs(e, seen.get(e.exId) || []));
+    for (const e of s.entries) { const ss = (e.sets || []).filter(x => x && x.r > 0); if (!ss.length) continue; if (!seen.has(e.exId)) seen.set(e.exId, []); seen.get(e.exId).unshift({ start: s.start, sets: ss }); }
+    if (JSON.stringify(s.prs || []) !== JSON.stringify(prs)) { s.prs = prs; changed.add(monthKey(s.start)); }
+  }
+  return changed;
+}
+function openSessEdit(id) {
+  const s = sessions().find(x => x.id === id); if (!s) return;
+  const bw = sessBW(s);
+  ui.se = {
+    id, date: dayKey(s.start), min: String(sessStats(s).min), bw: s.entries.some(e => e.type === 'bw') ? (bw == null ? '' : String(bw)) : null,
+    entries: s.entries.map(e => ({ exId: e.exId, name: exName(e.exId, e.name), type: typeOf(e.type), target: e.target || null,
+      sets: (e.sets || []).map(x => ({ w: x.w ? fmtN(x.w) : (typeOf(e.type) === 'weight' ? '0' : ''), r: String(x.r) })) })),
+    addName: '', addType: 'weight', newEx: false
+  };
+  openSheet('sedit', seHTML());
+}
+function seHTML() {
+  const d = ui.se;
+  const f = (id, key, label, mode, ph) => '<label for="' + id + '">' + label + '<input id="' + id + '" class="txt" ' + (mode === 'date' ? 'type="date"' : 'type="text" inputmode="' + mode + '" autocomplete="off"') + ' data-se="' + key + '" value="' + esc(d[key] == null ? '' : d[key]) + '"' + (ph ? ' placeholder="' + ph + '"' : '') + '></label>';
+  const list = d.entries.map((e, i) => {
+    const ca = isCardio(e.type), bw = e.type === 'bw';
+    const rows = e.sets.map((x, j) => '<div class="set"><span class="no">' + (j + 1) + '</span>' +
+      '<div class="field' + (ca ? ' wide-u' : '') + '"><input id="se-w-' + i + '-' + j + '" data-se="w" data-i="' + i + '" data-j="' + j + '" type="text" inputmode="decimal" autocomplete="off" value="' + esc(x.w) + '" placeholder="' + (bw || ca ? '0' : '—') + '" aria-label="' + esc(e.name) + ' ' + (j + 1) + (ca ? '구간 속도' : '세트 ' + (bw ? '가중' : '무게')) + '"><span class="u">' + (ca ? 'km/h' : bw ? '+kg' : 'kg') + '</span></div>' +
+      '<div class="field"><input id="se-r-' + i + '-' + j + '" data-se="r" data-i="' + i + '" data-j="' + j + '" type="text" inputmode="numeric" autocomplete="off" value="' + esc(x.r) + '" aria-label="' + esc(e.name) + ' ' + (j + 1) + (ca ? '구간 시간' : '세트 횟수') + '"><span class="u">' + (ca ? '분' : '회') + '</span></div>' +
+      '<button class="icon-btn sm ghost" type="button" data-act="se-del-set" data-i="' + i + '" data-j="' + j + '" aria-label="' + esc(e.name) + ' ' + (j + 1) + (ca ? '구간' : '세트') + ' 지우기">' + ICON.trash + '</button></div>').join('');
+    return '<section class="card ex"><header class="ex-h"><div class="ex-t"><h3>' + esc(e.name) + '<span class="se-type">' + TYPE_L[e.type] + '</span></h3></div>' +
+      '<button class="icon-btn sm ghost" type="button" data-act="se-rm-ex" data-i="' + i + '" aria-label="' + esc(e.name) + ' 이 기록에서 빼기">' + ICON.x + '</button></header>' +
+      '<div class="set-head" aria-hidden="true">' + (ca ? '<span>구간</span><span>속도 km/h</span><span>시간</span><span></span>' : '<span>세트</span><span>' + (bw ? '가중 kg' : '무게 kg') + '</span><span>횟수</span><span></span>') + '</div>' +
+      '<div class="sets">' + rows + '</div><div class="ex-foot"><button class="btn sm" type="button" id="se-as-' + i + '" data-act="se-add-set" data-i="' + i + '">+ ' + (ca ? '구간' : '세트') + '</button></div></section>';
+  }).join('');
+  return '<div class="sheet-h"><button class="btn ghost" type="button" data-act="sheet-close">취소</button><h2 id="sheet-title">기록 고치기</h2><button class="btn primary" type="button" data-act="se-save">저장</button></div>' +
+    '<div class="sheet-b"><div class="fgrid">' + f('se-date', 'date', '날짜', 'date') + f('se-min', 'min', '운동 시간 (분)', 'numeric') +
+      (d.bw != null ? f('se-bw', 'bw', '그날 체중 (kg)', 'decimal', '체성분 기록 사용') : '') + '</div>' +
+    '<div class="stack se-list">' + (list || '<p class="muted">운동이 없어요. 아래에서 추가해 주세요.</p>') + '</div>' +
+    '<div class="card addex"><label class="lbl" for="se-add">빠뜨린 운동 추가</label><input id="se-add" class="txt" list="se-ex-list" data-se="addName" value="' + esc(d.addName) + '" placeholder="예: 풀업, 러닝머신" autocomplete="off">' +
+      '<div class="row"><div class="seg sm" role="group" aria-label="새 운동 종류">' + typeSeg(d.addType, t => 'id="se-t' + t[0] + '" data-act="se-type" data-v="' + t + '"') + '</div><span class="grow"></span><button class="btn sm primary" type="button" id="se-add-ok" data-act="se-add-ex">추가</button></div>' +
+      '<datalist id="se-ex-list">' + state.exercises.map(x => '<option value="' + esc(x.name) + '"></option>').join('') + '</datalist></div>' +
+    '<p class="se-note">고친 기록은 다음 목표, 최고 기록, 성장 그래프, 캘린더 합계, 코치 점검에 바로 반영돼요.</p>' +
+    '<p class="err" id="se-err" role="alert" hidden></p></div>';
+}
+function seAddEx() {
+  const d = ui.se; if (!d) return;
+  const name = String(d.addName || '').trim().replace(/\s+/g, ' ');
+  if (!name) { toast('운동 이름을 입력해 주세요'); focusLater('se-add'); return; }
+  let ex = exByName(name);
+  if (!ex) {
+    const type = d.addType === 'weight' && looksCardio(name) ? 'cardio' : typeOf(d.addType), g = isCardio(type) ? { m: null, s: [] } : guessMuscles(name);
+    ex = { id: uid(), name, type, inc: isCardio(type) ? 0 : 2.5, m: g.m, s: g.s }; state.exercises.push(ex); d.newEx = true;
+  }
+  d.entries.push({ exId: ex.id, name: ex.name, type: typeOf(ex.type), target: null, sets: [{ w: '', r: '' }] });
+  if (ex.type === 'bw' && d.bw == null) { const s = sessions().find(x => x.id === d.id), v = s ? sessBW(s) : null; d.bw = v == null ? '' : String(v); }
+  d.addName = ''; refreshSheet(); focusLater('se-r-' + (d.entries.length - 1) + '-0');
+}
+function saveSessEdit() {
+  const d = ui.se; if (!d) return;
+  const s = sessions().find(x => x.id === d.id); if (!s) { closeSheet(); return; }
+  const err = document.getElementById('se-err');
+  const fail = m => { err.textContent = m; err.hidden = false; if (err.scrollIntoView) err.scrollIntoView({ block: 'nearest' }); };
+  const p = String(d.date || '').split('-').map(Number), old = new Date(s.start);
+  const start = p.length === 3 && p.every(Number.isFinite) ? new Date(p[0], p[1] - 1, p[2], old.getHours(), old.getMinutes()).getTime() : NaN;
+  if (!Number.isFinite(start)) return fail('날짜를 다시 확인해 주세요.');
+  if (start > Date.now() + 60000) return fail('앞으로의 날짜는 고를 수 없어요.');
+  const minN = num(d.min);
+  if (minN == null || minN < 1 || minN > 600) return fail('운동 시간을 1–600분 사이로 넣어 주세요.');
+  let bwV = null;
+  if (d.bw != null && String(d.bw).trim() !== '') { bwV = num(d.bw); if (bwV == null || bwV < 20 || bwV > 300) return fail('그날 체중을 다시 확인해 주세요.'); }
+  const entries = [];
+  for (const e of d.entries) {
+    const ca = isCardio(e.type), sets = [];
+    for (let j = 0; j < e.sets.length; j++) {
+      const x = e.sets[j], rs = String(x.r).trim(), ws = String(x.w).trim();
+      if (!rs && !ws) continue;
+      const r = num(rs), w = ws ? num(ws) : 0;
+      if (r == null || r <= 0 || r > (ca ? 600 : 1000)) return fail(e.name + ' ' + (j + 1) + (ca ? '구간 시간' : '세트 횟수') + '를 다시 확인해 주세요.');
+      if (w == null || w < 0 || w > 1000) return fail(e.name + ' ' + (j + 1) + (ca ? '구간 속도' : '세트 무게') + '를 다시 확인해 주세요.');
+      sets.push({ w: r2(w), r: Math.round(r) });
+    }
+    if (sets.length) entries.push(Object.assign({ exId: e.exId, name: e.name, type: e.type }, e.target ? { target: e.target } : {}, { sets }));
+  }
+  if (!entries.length) return fail('세트를 하나 이상 남겨 주세요. 기록을 통째로 지우려면 기록 탭의 휴지통을 눌러요.');
+  const oldK = monthKey(s.start), newK = monthKey(start);
+  s.entries = entries; s.start = start; s.end = start + Math.round(minN) * 60000;
+  if (bwV != null) s.bw = r1(bwV); else delete s.bw;
+  if (oldK !== newK) { state.months[oldK] = (state.months[oldK] || []).filter(x => x.id !== s.id); (state.months[newK] = state.months[newK] || []).push(s); }
+  invalidate();
+  const changed = recomputePRs(); changed.add(oldK); changed.add(newK);
+  changed.forEach(k => saveMonth(k));
+  const nEx = state.exercises.length; gcExercises();
+  if (d.newEx || state.exercises.length !== nEx) saveApp();
+  const sd = new Date(start); ui.calDay = dayKey(start); ui.calMonth = new Date(sd.getFullYear(), sd.getMonth(), 1).getTime();
+  closeSheet(); render(); toast('기록을 고쳤어요. 다음 목표와 그래프에도 반영했어요');
+}
 async function delSession(sid) {
   const s = sessions().find(x => x.id === sid); if (!s) return;
   if (!(await ask(md(s.start) + ' ' + (s.routineName || '운동') + ' 기록을 지울까요? 되돌릴 수 없어요.', '지우기'))) return;
@@ -1614,13 +1719,14 @@ function refreshSheet() {
   else if (ui.sheet === 'p-custom' && ui.pc) p.innerHTML = customHTML();
   else if (ui.sheet === 'p-quick' && ui.pk) p.innerHTML = quickHTML();
   else if (ui.sheet === 'p-target' && ui.pt) p.innerHTML = targetHTML();
+  else if (ui.sheet === 'sedit' && ui.se) p.innerHTML = seHTML();
   p.scrollTop = top;
   if (act) { const el = document.getElementById(act); if (el && p.contains(el)) el.focus({ preventScroll: true }); }
 }
 function closeSheet() {
   document.getElementById('sheet').hidden = true;
   document.getElementById('sheet-panel').innerHTML = '';
-  ui.sheet = null; ui.xs = null; ui.bd = null; ui.pa = null; ui.pc = null; ui.pk = null; ui.pt = null; edit = null;
+  ui.sheet = null; ui.xs = null; ui.bd = null; ui.pa = null; ui.pc = null; ui.pk = null; ui.pt = null; ui.se = null; edit = null;
   document.body.classList.remove('locked');
   if (sheetReturn && document.contains(sheetReturn) && sheetReturn.focus) sheetReturn.focus({ preventScroll: true });
   sheetReturn = null;
@@ -2521,6 +2627,13 @@ document.addEventListener('click', ev => {
     case 'export': exportData(); break;
     case 'copy-export': copyExport(); break;
     case 'delsess': delSession(id); break;
+    case 'sess-edit': openSessEdit(id); break;
+    case 'se-add-set': if (ui.se) { const e = ui.se.entries[+t.dataset.i]; if (e) { const l = e.sets[e.sets.length - 1]; e.sets.push({ w: l ? l.w : '', r: '' }); refreshSheet(); focusLater('se-r-' + t.dataset.i + '-' + (e.sets.length - 1)); } } break;
+    case 'se-del-set': if (ui.se) { const e = ui.se.entries[+t.dataset.i]; if (e) { e.sets.splice(+t.dataset.j, 1); refreshSheet(); } } break;
+    case 'se-rm-ex': if (ui.se) { ui.se.entries.splice(+t.dataset.i, 1); refreshSheet(); } break;
+    case 'se-type': if (ui.se) { ui.se.addType = typeOf(v); refreshSheet(); } break;
+    case 'se-add-ex': seAddEx(); break;
+    case 'se-save': saveSessEdit(); break;
     case 'pick-ex': ui.progEx = id; ui.metric = null; render(); break;
     case 'metric': ui.metric = v; render(); break;
     case 'xs-open': openXs(id); break;
@@ -2571,6 +2684,7 @@ document.addEventListener('input', ev => {
   else if (el.dataset.pc && ui.pc) ui.pc[el.dataset.pc] = el.value;
   else if (el.dataset.pk && ui.pk) ui.pk[el.dataset.pk] = el.value;
   else if (el.dataset.pt && ui.pt) { ui.pt[el.dataset.pt] = el.value; ptSync(); }
+  else if (el.dataset.se && ui.se) { const k = el.dataset.se; if (k === 'w' || k === 'r') { const x = (ui.se.entries[+el.dataset.i] || { sets: [] }).sets[+el.dataset.j]; if (x) x[k] = el.value; } else ui.se[k] = el.value; }
 });
 document.addEventListener('change', ev => {
   const el = ev.target;
@@ -2610,7 +2724,7 @@ boot();
 
 <script>
 // 오프라인 사용을 위한 서비스 워커와, 기기 저장 공간이 지워지지 않도록 요청
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=ec94b6e309').catch(() => {}));
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=d2ee8070ad').catch(() => {}));
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 </script>
 </body>
