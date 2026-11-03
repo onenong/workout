@@ -1,5 +1,5 @@
-// 오버로드 로그 서비스 워커 · d3dafdd528
-const SHELL = 'overload-shell-d3dafdd528', FONTS = 'overload-fonts';
+// 오버로드 로그 서비스 워커 · adbe1857fc
+const SHELL = 'overload-shell-adbe1857fc', FONTS = 'overload-fonts';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => Promise.all(ASSETS.map(a => c.add(a).catch(() => {}))) ).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {

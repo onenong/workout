@@ -195,6 +195,9 @@ body.has-rest main.wrap{padding-bottom:calc(var(--tabbar-h) + 112px)}
 .field input::placeholder{color:var(--ink-3);font-weight:500}
 .field input:focus{outline:none;background:var(--panel);box-shadow:0 0 0 2px var(--ink)}
 .field .u{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--ink-3);pointer-events:none}
+.field.wide-u input{padding-right:44px}
+.notice.bwn{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.notice.bwn .btn{flex:none}
 .chk{appearance:none;display:grid;place-items:center;width:46px;height:46px;padding:0;border-radius:12px;border:1.5px solid var(--line);background:var(--panel);color:var(--ink-3);cursor:pointer}
 .chk .ic{width:22px;height:22px;stroke-width:2.4}
 .chk:hover{border-color:var(--ink-3);color:var(--ink)}
@@ -709,7 +712,7 @@ function hist(exId) {
       const sets = (e.sets || []).filter(x => x && x.r > 0);
       if (!sets.length) continue;
       if (!_hist.has(e.exId)) _hist.set(e.exId, []);
-      _hist.get(e.exId).push({ start: s.start, sets });
+      _hist.get(e.exId).push({ start: s.start, sets, bw: Number.isFinite(s.bw) ? s.bw : null });
     }
   }
   return _hist.get(exId) || [];
@@ -718,6 +721,20 @@ const exById = id => state.exercises.find(x => x.id === id) || null;
 const exByName = n => state.exercises.find(x => norm(x.name) === norm(n)) || null;
 const exName = (id, fb) => (exById(id) || {}).name || fb || '이름 없는 운동';
 const itemTarget = it => ({ sets: it.sets, repMin: it.repMin, repMax: it.repMax });
+const TYPES = ['weight', 'bw', 'cardio'];
+const typeOf = v => TYPES.includes(v) ? v : 'weight';
+const isCardio = t => t === 'cardio';
+const CARDIO_RE = /러닝|런닝|트레드밀|달리기|조깅|걷기|사이클|자전거|스피닝|로잉|천국의 ?계단|스텝밀|계단 ?오르기|일립티컬|크로스 ?트레이너|줄넘기|수영|유산소|treadmill|running|jogging|cycling|bike|rowing|elliptical|stair/i;
+const looksCardio = n => CARDIO_RE.test(String(n || '')) && !/런지|lunge/i.test(String(n || ''));
+const CARDIO_TGT = { sets: 1, repMin: 20, repMax: 20 };
+// 그 시점의 몸무게: 그날까지의 마지막 측정, 그 전 측정이 없으면 첫 측정
+function bodyW(ts) {
+  const B = bodySorted().filter(b => b.w != null); if (!B.length) return null;
+  let v = B[0].w; for (const b of B) { if (b.at <= ts + DAY / 2) v = b.w; else break; }
+  return v;
+}
+const sessBW = s => Number.isFinite(s.bw) ? s.bw : bodyW(s.start);
+const kmOf = sets => sets.reduce((a, x) => a + (x.w || 0) * (x.r || 0) / 60, 0);
 
 /* ── 점진적 과부하 규칙 ───────────────────────── */
 const topW = sets => sets.reduce((m, s) => Math.max(m, s.w || 0), 0);
@@ -726,6 +743,10 @@ const repsAt = (sets, W) => sets.reduce((a, s) => a + ((s.w || 0) === W ? (s.r |
 // 이중 진행(double progression): 모든 세트가 범위 상한 → 증량, 아니면 같은 무게로 세트마다 +1회.
 // 같은 무게에서 3회 연속 총 횟수가 늘지 않으면 정체(무게 운동은 10% 디로드).
 function recommend(ex, tgt, history) {
+  if (isCardio(ex.type)) {   // 유산소: 지난번 속도·시간을 그대로 채움
+    const last = (history || []).map(h => (h.sets || []).filter(x => x.r > 0)).find(ss => ss.length), n = Math.max(1, tgt.sets | 0);
+    return { kind: 'cardio', w: last ? (last[0].w || null) : null, reps: Array.from({ length: n }, (_, i) => last && last[i] ? last[i].r : tgt.repMin) };
+  }
   const S = Math.max(1, tgt.sets | 0), a = tgt.repMin, b = Math.max(tgt.repMin, tgt.repMax);
   const inc = Number(ex.inc) || 0, bw = ex.type === 'bw';
   const fill = v => Array.from({ length: S }, () => v);
@@ -751,11 +772,13 @@ function recommend(ex, tgt, history) {
 function wLabel(w, type) { return type === 'bw' ? (w > 0 ? '+' + fmtN(w) + 'kg' : '맨몸') : (w == null ? '—' : fmtN(w) + 'kg'); }
 function setsText(sets, type) {
   if (!sets || !sets.length) return '';
+  if (isCardio(type)) { const km = r1(kmOf(sets)); return sets.map(x => (x.w ? fmtN(x.w) + 'km/h ' : '') + fmtN(x.r) + '분').join(' · ') + (km ? ' · ' + fmtN(km) + 'km' : ''); }
   if (sets.every(s => (s.w || 0) === (sets[0].w || 0))) return wLabel(sets[0].w || 0, type) + ' × ' + sets.map(s => s.r).join('·');
   return sets.map(s => (type === 'bw' ? (s.w > 0 ? '+' + fmtN(s.w) : '맨몸') : fmtN(s.w || 0)) + '×' + s.r).join(' · ');
 }
 function recView(rec, type, inc, tgt) {
   const bw = type === 'bw', reps = (rec.reps || []).join('·');
+  if (rec.kind === 'cardio') return { k: '유산소', v: (rec.w ? fmtN(rec.w) + 'km/h · ' : '') + rec.reps.reduce((a, b) => a + b, 0) + '분', note: '' };
   switch (rec.kind) {
     case 'new': return { k: '첫 기록', v: (bw ? '맨몸 ' : '') + tgt.repMin + '–' + tgt.repMax + '회', note: bw ? '' : '목표 횟수를 채울 수 있는 무게로 기준을 잡아요.' };
     case 'up':
@@ -781,24 +804,31 @@ function makeEntry(ex, tgt, it) {
   };
 }
 const restLabel = sec => sec % 60 === 0 ? (sec / 60) + '분' : sec > 60 ? Math.floor(sec / 60) + '분 ' + (sec % 60) + '초' : sec + '초';
+// 맨몸 운동 볼륨은 (체중 + 가중) × 횟수, 유산소는 시간·거리로 따로 셈
 function liveTotals(L) {
-  let done = 0, total = 0, reps = 0, vol = 0;
+  let done = 0, total = 0, reps = 0, vol = 0, cmin = 0;
+  const bw = bodyW(L.start) || 0;
   for (const e of L.entries) for (const s of e.sets) {
     total++;
-    if (s.done) { done++; reps += s.r || 0; if (e.type !== 'bw') vol += (s.w || 0) * (s.r || 0); }
+    if (!s.done) continue;
+    done++;
+    if (isCardio(e.type)) { cmin += s.r || 0; continue; }
+    reps += s.r || 0; vol += ((e.type === 'bw' ? bw : 0) + (s.w || 0)) * (s.r || 0);
   }
-  return { done, total, reps, vol };
+  return { done, total, reps, vol, cmin };
 }
 function sessStats(s) {
-  let sets = 0, reps = 0, vol = 0, bwReps = 0;
+  let sets = 0, reps = 0, vol = 0, bwReps = 0, cmin = 0, km = 0;
+  const bw = sessBW(s) || 0;
   for (const e of s.entries || []) for (const x of e.sets || []) {
+    if (isCardio(e.type)) { cmin += x.r; km += (x.w || 0) * x.r / 60; continue; }
     sets++; reps += x.r;
-    if (e.type === 'bw') bwReps += x.r; else vol += (x.w || 0) * x.r;
+    if (e.type === 'bw') { bwReps += x.r; vol += (bw + (x.w || 0)) * x.r; } else vol += (x.w || 0) * x.r;
   }
-  return { sets, reps, vol, bwReps, min: Math.max(1, Math.round(((s.end || s.start) - s.start) / 60000)) };
+  return { sets, reps, vol, bwReps, cmin, km: r1(km), min: Math.max(1, Math.round(((s.end || s.start) - s.start) / 60000)) };
 }
 function findPRs(entry, prev) {
-  if (!prev.length) return [];
+  if (!prev.length || isCardio(entry.type)) return [];
   const all = prev.flatMap(h => h.sets), out = [];
   const mw = topW(entry.sets), pmw = topW(all);
   if (entry.type === 'bw') {
@@ -831,11 +861,14 @@ function trackedExercises() {
   }
   return [...seen.values()];
 }
-function seriesFor(H, metric) {
+function seriesFor(H, metric, type) {
   return H.slice().reverse().map(h => {
-    const ss = h.sets; let v;
+    const ss = h.sets, base = type === 'bw' ? ((h.bw != null ? h.bw : bodyW(h.start)) || 0) : 0; let v;
     switch (metric) {
-      case 'e1rm': v = Math.max(...ss.map(s => e1rm(s.w, s.r))); break;
+      case 'e1rm': v = Math.max(...ss.map(s => e1rm(base + (s.w || 0), s.r))); break;
+      case 'km': v = kmOf(ss); break;
+      case 'min': v = ss.reduce((a, s) => a + s.r, 0); break;
+      case 'speed': { const m = ss.reduce((a, s) => a + s.r, 0); v = m ? kmOf(ss) / (m / 60) : 0; break; }
       case 'top': case 'added': v = topW(ss); break;
       case 'vol': v = ss.reduce((a, s) => a + (s.w || 0) * s.r, 0); break;
       case 'reps': v = Math.max(...ss.map(s => s.r)); break;
@@ -1092,36 +1125,45 @@ function viewSession() {
   const L = state.live, T = liveTotals(L);
   let h = '<div class="sess-top"><div class="sess-id"><div class="eyebrow">진행 중 · ' + dayLabel(L.start) + (L.deload ? ' · 디로드' : '') + '</div><h1 class="page-title">' + esc(L.routineName || '자유 운동') + '</h1></div><div class="clock" id="clock" role="timer" aria-label="운동 시간">' + clock((Date.now() - L.start) / 1000) + '</div></div>';
   h += '<div class="meter" role="progressbar" aria-label="완료한 세트" aria-valuemin="0" aria-valuemax="' + T.total + '" aria-valuenow="' + T.done + '"><i style="width:' + (T.total ? (T.done / T.total * 100).toFixed(1) : 0) + '%"></i></div>';
-  h += '<p class="sess-sum"><b>' + T.done + '</b> / ' + T.total + '세트 완료' + (T.reps ? ' · 횟수 ' + T.reps : '') + (T.vol ? ' · 볼륨 ' + fmtK(T.vol) + 'kg' : '') + '</p>';
+  h += '<p class="sess-sum"><b>' + T.done + '</b> / ' + T.total + '세트 완료' + (T.reps ? ' · 횟수 ' + T.reps : '') + (T.vol ? ' · 볼륨 ' + fmtK(T.vol) + 'kg' : '') + (T.cmin ? ' · 유산소 ' + T.cmin + '분' : '') + '</p>';
+  if (L.entries.some(e => e.type === 'bw') && bodyW(L.start) == null) h += '<div class="notice bwn">몸무게를 넣으면 맨몸 운동을 체중 + 가중으로 계산해요.<button class="btn sm" type="button" data-act="body-open">몸무게 입력</button></div>';
   h += '<div class="stack">' + (L.entries.map(exCard).join('') || '<div class="card empty"><p>아직 운동이 없어요. 아래에서 추가해 주세요.</p></div>') + '</div>';
   h += addExBlock();
   h += '<div class="sess-actions"><button class="btn primary block" data-act="finish">운동 완료</button><button class="btn ghost block" data-act="discard">기록하지 않고 취소</button></div>';
   return h;
 }
-const wVal = (s, e) => (s.w == null || (e.type === 'bw' && !s.w)) ? '' : fmtN(s.w);
+const wVal = (s, e) => (s.w == null || ((e.type === 'bw' || isCardio(e.type)) && !s.w)) ? '' : fmtN(s.w);
 function exCard(e, i) {
   const name = exName(e.exId, e.name), bw = e.type === 'bw';
   const allDone = e.sets.length > 0 && e.sets.every(s => s.done);
   return '<section class="card ex" aria-label="' + esc(name) + '">' +
     '<header class="ex-h"><div class="ex-t"><h3>' + esc(name) + (allDone ? '<span class="pill">완료</span>' : '') + '</h3></div>' +
     '<button class="icon-btn sm ghost" type="button" data-act="rmex" data-e="' + i + '" aria-label="' + esc(name) + ' 오늘 운동에서 빼기">' + ICON.x + '</button></header>' +
-    '<div class="set-head" aria-hidden="true"><span>세트</span><span>' + (bw ? '가중 kg' : '무게 kg') + '</span><span>횟수</span><span>완료</span></div>' +
+    '<div class="set-head" aria-hidden="true">' + setHead(e) + '</div>' +
     '<div class="sets">' + e.sets.map((s, j) => setRow(e, i, s, j)).join('') + '</div>' +
-    '<div class="ex-foot"><button class="btn sm" type="button" data-act="addset" data-e="' + i + '">+ 세트</button><button class="btn sm ghost" type="button" data-act="delset" data-e="' + i + '"' + (e.sets.length ? '' : ' disabled') + '>− 세트</button></div>' +
+    '<div class="ex-foot"><button class="btn sm" type="button" data-act="addset" data-e="' + i + '">+ ' + (isCardio(e.type) ? '구간' : '세트') + '</button><button class="btn sm ghost" type="button" data-act="delset" data-e="' + i + '"' + (e.sets.length ? '' : ' disabled') + '>− ' + (isCardio(e.type) ? '구간' : '세트') + '</button></div>' +
     '</section>';
 }
+function setHead(e) {
+  const L = state.live, bwKg = L ? bodyW(L.start) : null;
+  if (isCardio(e.type)) return '<span>구간</span><span>속도 km/h</span><span>시간</span><span>완료</span>';
+  if (e.type === 'bw') return '<span>세트</span><span>' + (bwKg ? '체중 ' + fmtN(bwKg) + ' + kg' : '가중 kg') + '</span><span>횟수</span><span>완료</span>';
+  return '<span>세트</span><span>무게 kg</span><span>횟수</span><span>완료</span>';
+}
 function setRow(e, i, s, j) {
-  const id = i + '-' + j, bw = e.type === 'bw', wv = wVal(s, e);
+  const id = i + '-' + j, bw = e.type === 'bw', ca = isCardio(e.type), wv = wVal(s, e);
   return '<div class="set' + (s.done ? ' done' : '') + '"><span class="no">' + (j + 1) + '</span>' +
-    '<div class="field"><input id="w-' + id + '" data-f="w" data-e="' + i + '" data-s="' + j + '" data-prev="' + esc(wv) + '" type="text" inputmode="decimal" enterkeyhint="next" autocomplete="off" value="' + esc(wv) + '" placeholder="' + (bw ? '0' : '—') + '" aria-label="' + (j + 1) + '세트 ' + (bw ? '가중' : '무게') + ' kg"><span class="u">kg</span></div>' +
-    '<div class="field"><input id="r-' + id + '" data-f="r" data-e="' + i + '" data-s="' + j + '" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off" value="' + (s.r == null ? '' : s.r) + '" placeholder="' + (s.tr || '') + '" aria-label="' + (j + 1) + '세트 횟수, 목표 ' + (s.tr || '') + '회"><span class="u">회</span></div>' +
+    '<div class="field' + (ca ? ' wide-u' : '') + '"><input id="w-' + id + '" data-f="w" data-e="' + i + '" data-s="' + j + '" data-prev="' + esc(wv) + '" type="text" inputmode="decimal" enterkeyhint="next" autocomplete="off" value="' + esc(wv) + '" placeholder="' + (bw ? '0' : '—') + '" aria-label="' + (j + 1) + (ca ? '구간 속도 km/h' : '세트 ' + (bw ? '체중에 더한 가중' : '무게') + ' kg') + '"><span class="u">' + (ca ? 'km/h' : bw ? '+kg' : 'kg') + '</span></div>' +
+    '<div class="field"><input id="r-' + id + '" data-f="r" data-e="' + i + '" data-s="' + j + '" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off" value="' + (s.r == null ? '' : s.r) + '" placeholder="' + (s.tr || '') + '" aria-label="' + (j + 1) + (ca ? '구간 시간, 목표 ' + (s.tr || '') + '분' : '세트 횟수, 목표 ' + (s.tr || '') + '회') + '"><span class="u">' + (ca ? '분' : '회') + '</span></div>' +
     '<button class="chk" type="button" id="c-' + id + '" data-act="done" data-e="' + i + '" data-s="' + j + '" aria-pressed="' + !!s.done + '" aria-label="' + (j + 1) + '세트 완료">' + ICON.check + '</button></div>';
 }
+const TYPE_L = { weight: '무게', bw: '맨몸', cardio: '유산소' };
+const typeSeg = (cur, attrs) => TYPES.map(t => '<button type="button" ' + attrs(t) + ' aria-pressed="' + (typeOf(cur) === t) + '">' + TYPE_L[t] + '</button>').join('');
 function addExBlock() {
   if (!ui.addEx) return '<button class="btn block dashed gap-top" type="button" data-act="addex-open">+ 운동 추가</button>';
   return '<div class="card addex"><label class="lbl" for="addex-name">추가할 운동</label>' +
     '<input id="addex-name" class="txt" list="ex-list-main" value="' + esc(ui.addExName) + '" placeholder="예: 플랭크, 벤치프레스" autocomplete="off" enterkeyhint="done">' +
-    '<div class="row"><div class="seg sm grow-none" role="group" aria-label="새 운동 종류"><button type="button" data-act="addex-type" data-v="weight" aria-pressed="' + (ui.addExType !== 'bw') + '">무게</button><button type="button" data-act="addex-type" data-v="bw" aria-pressed="' + (ui.addExType === 'bw') + '">맨몸</button></div>' +
+    '<div class="row"><div class="seg sm grow-none" role="group" aria-label="새 운동 종류">' + typeSeg(ui.addExType, t => 'data-act="addex-type" data-v="' + t + '"') + '</div>' +
     '<span class="grow"></span><button class="btn sm" type="button" data-act="addex-cancel">닫기</button><button class="btn sm primary" type="button" data-act="addex-ok">추가</button></div>' +
     '<datalist id="ex-list-main">' + state.exercises.map(x => '<option value="' + esc(x.name) + '"></option>').join('') + '</datalist></div>';
 }
@@ -1132,7 +1174,7 @@ function viewRoutines() {
     h += '<div class="card empty"><h2>아직 루틴이 없어요</h2><p>운동, 세트 수, 목표 횟수 범위, 증량 단위를 정해 두면 그 기준으로 다음 목표를 잡아요.</p></div>';
   } else {
     h += '<div class="stack">' + state.routines.map(rt => {
-      const items = rt.items.map(it => { const ex = exById(it.exId); return ex ? esc(ex.name) + ' <span class="nv">' + it.sets + '×' + it.repMin + '–' + it.repMax + '</span>' : ''; }).filter(Boolean).join(' · ');
+      const items = rt.items.map(it => { const ex = exById(it.exId); return ex ? esc(ex.name) + ' <span class="nv">' + (isCardio(ex.type) ? (it.sets > 1 ? it.sets + '×' : '') + it.repMin + '분' : it.sets + '×' + it.repMin + '–' + it.repMax) + '</span>' : ''; }).filter(Boolean).join(' · ');
       return '<article class="card rt-row"><div class="rt-main"><h2>' + esc(rt.name) + '</h2><p class="muted">' + (items || '운동 없음') + '</p></div>' +
         '<div class="rt-actions"><button class="btn" type="button" data-act="edit" data-id="' + esc(rt.id) + '">편집</button><button class="btn primary" type="button" data-act="start" data-id="' + esc(rt.id) + '">시작</button></div></article>';
     }).join('') + '</div>';
@@ -1175,7 +1217,9 @@ function logItem(s) {
   const d = new Date(s.start), st = sessStats(s);
   const lines = s.entries.map(e => '<li><span class="ln">' + esc(exName(e.exId, e.name)) + '</span><span class="lv">' + esc(setsText(e.sets, e.type)) + '</span></li>').join('');
   const prs = (s.prs || []).map(p => '<span class="pr">PR · ' + esc(exName(p.exId, '')) + ' ' + esc(p.label) + '</span>').join('');
-  const meta = [st.min + '분', st.sets + '세트'];
+  const meta = [st.min + '분'];
+  if (st.sets) meta.push(st.sets + '세트');
+  if (st.cmin) meta.push('유산소 ' + st.cmin + '분' + (st.km ? ' · ' + fmtN(st.km) + 'km' : ''));
   if (st.bwReps) meta.push('맨몸 ' + st.bwReps + '회');
   if (st.vol) meta.push('볼륨 ' + fmtK(st.vol) + 'kg');
   return '<article class="log"><div class="log-d"><b>' + d.getDate() + '</b><span>' + DOW[d.getDay()] + '</span></div><div class="log-b">' +
@@ -1193,25 +1237,36 @@ function viewProgress() {
   const chips = '<div class="chips" role="group" aria-label="항목 선택">' + list.map(t => '<button type="button" class="chip" data-act="pick-ex" data-id="' + esc(t.id) + '" aria-pressed="' + (t.id === ui.progEx) + '">' + esc(t.name) + '</button>').join('') + '</div>';
   if (ui.progEx === '__body') return h + chips + bodyProgress(B);
   const cur = tr.find(t => t.id === ui.progEx), type = cur.type;
-  const metrics = type === 'bw' ? [['reps', '최고 횟수', '회'], ['total', '총 횟수', '회'], ['added', '가중', 'kg']] : [['e1rm', '추정 1RM', 'kg'], ['top', '최고 무게', 'kg'], ['vol', '볼륨', 'kg']];
+  const hasBW = bodySorted().some(b => b.w != null);
+  const metrics = isCardio(type) ? [['km', '거리', 'km'], ['min', '시간', '분'], ['speed', '평균 속도', 'km/h']]
+    : type === 'bw' ? (hasBW ? [['e1rm', '추정 1RM', 'kg'], ['reps', '최고 횟수', '회'], ['added', '가중', 'kg']] : [['reps', '최고 횟수', '회'], ['total', '총 횟수', '회'], ['added', '가중', 'kg']])
+    : [['e1rm', '추정 1RM', 'kg'], ['top', '최고 무게', 'kg'], ['vol', '볼륨', 'kg']];
   if (!metrics.some(m => m[0] === ui.metric)) ui.metric = metrics[0][0];
   const met = metrics.find(m => m[0] === ui.metric);
   const H = hist(cur.id);
-  ui.chart = { pts: seriesFor(H, met[0]), unit: met[2], type, title: cur.name + ' ' + met[1] };
+  ui.chart = { pts: seriesFor(H, met[0], type), unit: met[2], type, title: cur.name + ' ' + met[1] };
   h += chips;
   h += '<section class="card chart-card"><div class="chart-h"><h2>' + esc(cur.name) + ' <span class="muted">· ' + met[1] + '</span></h2>' +
     '<div class="seg sm" role="group" aria-label="지표">' + metrics.map(m => '<button type="button" data-act="metric" data-v="' + m[0] + '" aria-pressed="' + (m[0] === met[0]) + '">' + m[1] + '</button>').join('') + '</div></div>' +
     '<div class="chart" id="chart" aria-label="기록 그래프. 좌우 화살표로 날짜별 값을 볼 수 있어요."></div>' +
     (H.length < 2 ? '<p class="chart-note">기록이 2번 이상 쌓이면 추세선이 그려져요.</p>' : '') + '</section>';
   h += tilesHTML(H, type) + recentTable(H, type);
-  h += '<div class="row center"><button class="btn" type="button" data-act="xs-open" data-id="' + esc(cur.id) + '">이 운동 설정 · 이름, 종류, 증량 단위</button></div>';
+  if (type === 'bw' && hasBW && met[0] === 'e1rm') h += '<p class="hint">맨몸 운동의 추정 1RM은 그날 체중 + 가중으로 계산했어요.</p>';
+  h += '<div class="row center"><button class="btn" type="button" data-act="xs-open" data-id="' + esc(cur.id) + '">이 운동 설정 · 이름, 종류' + (isCardio(type) ? '' : ', 증량 단위') + '</button></div>';
   return h;
 }
 function tilesHTML(H, type) {
   const last = H[0], first = H[H.length - 1];
   const tile = (l, v, sub, vc, sc) => '<div class="tile"><span class="lbl">' + l + '</span><b class="' + (vc || '') + '">' + v + '</b><small class="' + (sc || '') + '">' + sub + '</small></div>';
   const t = [];
-  if (type === 'bw') {
+  if (isCardio(type)) {
+    let bk = 0, bkT = 0;
+    H.forEach(h => { const k = kmOf(h.sets); if (k > bk) { bk = k; bkT = h.start; } });
+    const mins = h => h.sets.reduce((a, s) => a + s.r, 0), lm = mins(last), pm = H[1] ? mins(H[1]) : null, dk = r1(kmOf(last.sets) - kmOf(first.sets));
+    t.push(tile('최장 거리', fmtN(r1(bk)) + 'km', md(bkT)));
+    t.push(tile('최근 시간', lm + '분', pm == null ? md(last.start) : '지난번 ' + signed(lm - pm, '분'), '', pm == null ? '' : dcls(lm - pm)));
+    t.push(tile('첫 기록 대비', H.length > 1 ? signed(dk, 'km') : '—', H.length + '회 기록 · 거리', H.length > 1 ? dcls(dk) : ''));
+  } else if (type === 'bw') {
     let mr = 0, mrT = 0;
     H.forEach(h => h.sets.forEach(s => { if (s.r > mr) { mr = s.r; mrT = h.start; } }));
     const tot = h => h.sets.reduce((a, s) => a + s.r, 0);
@@ -1236,10 +1291,10 @@ function tilesHTML(H, type) {
 }
 function recentTable(H, type) {
   const rows = H.slice(0, 8).map(h => {
-    const val = type === 'bw' ? h.sets.reduce((a, s) => a + s.r, 0) + '회' : r1(Math.max(...h.sets.map(s => e1rm(s.w, s.r)))) + 'kg';
+    const val = isCardio(type) ? fmtN(r1(kmOf(h.sets))) + 'km' : type === 'bw' ? h.sets.reduce((a, s) => a + s.r, 0) + '회' : r1(Math.max(...h.sets.map(s => e1rm(s.w, s.r)))) + 'kg';
     return '<tr><td>' + md(h.start) + '</td><td>' + esc(setsText(h.sets, type)) + '</td><td class="n">' + val + '</td></tr>';
   }).join('');
-  return '<section class="card tbl-card"><h2 class="tbl-h">최근 기록</h2><div class="tbl-wrap"><table class="rtbl"><thead><tr><th scope="col">날짜</th><th scope="col">세트</th><th scope="col" class="n">' + (type === 'bw' ? '총 횟수' : '추정 1RM') + '</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
+  return '<section class="card tbl-card"><h2 class="tbl-h">최근 기록</h2><div class="tbl-wrap"><table class="rtbl"><thead><tr><th scope="col">날짜</th><th scope="col">세트</th><th scope="col" class="n">' + (isCardio(type) ? '거리' : type === 'bw' ? '총 횟수' : '추정 1RM') + '</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
 }
 
 function niceTicks(lo, hi, n, minStep) {
@@ -1386,14 +1441,14 @@ function toggleDone(ei, si) {
   const s = e.sets[si]; if (!s) return;
   if (!s.done) {
     if (s.w == null) {
-      if (e.type === 'bw') s.w = 0;
+      if (e.type === 'bw' || isCardio(e.type)) s.w = 0;
       else { toast('무게를 먼저 입력해 주세요'); focusLater('w-' + ei + '-' + si); return; }
     }
     if (!(s.r > 0)) s.r = s.tr || e.target.repMin;
     s.done = true;
     const nx = e.sets[si + 1];
     if (nx && !nx.done && nx.w == null) nx.w = s.w;
-    startRest(state.settings.rest ? (e.rest || state.settings.rest) : 0);
+    if (!isCardio(e.type)) startRest(state.settings.rest ? (e.rest || state.settings.rest) : 0);
   } else s.done = false;
   saveLive(); render();
 }
@@ -1419,10 +1474,13 @@ function addExToSession() {
   const name = String(ui.addExName || '').trim().replace(/\s+/g, ' ');
   if (!name) { toast('운동 이름을 입력해 주세요'); focusLater('addex-name'); return; }
   let ex = exByName(name);
-  if (!ex) { const g = guessMuscles(name); ex = { id: uid(), name, type: ui.addExType === 'bw' ? 'bw' : 'weight', inc: 2.5, m: g.m, s: g.s }; state.exercises.push(ex); saveApp(); }
+  if (!ex) {
+    const type = ui.addExType === 'weight' && looksCardio(name) ? 'cardio' : typeOf(ui.addExType), g = isCardio(type) ? { m: null, s: [] } : guessMuscles(name);
+    ex = { id: uid(), name, type, inc: isCardio(type) ? 0 : 2.5, m: g.m, s: g.s }; state.exercises.push(ex); saveApp();
+  }
   let tgt = null, src = null;
   for (const r of state.routines) { const it = r.items.find(x => x.exId === ex.id); if (it) { tgt = itemTarget(it); src = it; break; } }
-  if (!tgt) tgt = ex.type === 'bw' ? { sets: 3, repMin: 8, repMax: 15 } : { sets: 3, repMin: 8, repMax: 12 };
+  if (!tgt) tgt = isCardio(ex.type) ? Object.assign({}, CARDIO_TGT) : ex.type === 'bw' ? { sets: 3, repMin: 8, repMax: 15 } : { sets: 3, repMin: 8, repMax: 12 };
   state.live.entries.push(makeEntry(ex, tgt, src));
   ui.addEx = false; ui.addExName = '';
   saveLive(); render();
@@ -1441,6 +1499,8 @@ async function finish() {
   entries.forEach(e => prs.push(...findPRs(e, hist(e.exId))));
   const prev = L.routineId ? sessions().find(s => s.routineId === L.routineId) : null;
   const sess = { id: L.id, routineId: L.routineId || null, routineName: L.routineName || '자유 운동', start: L.start, end: Date.now(), entries, prs };
+  const bwKg = entries.some(e => e.type === 'bw') ? bodyW(L.start) : null;
+  if (bwKg) sess.bw = bwKg;
   const k = monthKey(L.start);
   (state.months[k] = state.months[k] || []).push(sess);
   invalidate(); saveMonth(k);
@@ -1598,8 +1658,11 @@ function toastAct() {
 
 function summaryHTML(s, prev) {
   const st = sessStats(s);
-  const tiles = [['운동 시간', st.min + '분'], ['완료 세트', st.sets + '세트'], ['총 횟수', st.reps + '회']];
+  const tiles = [['운동 시간', st.min + '분']];
+  if (st.sets) tiles.push(['완료 세트', st.sets + '세트'], ['총 횟수', st.reps + '회']);
   if (st.vol) tiles.push(['볼륨', fmtK(st.vol) + 'kg']);
+  if (st.cmin) tiles.push(['유산소', st.cmin + '분']);
+  if (st.km) tiles.push(['거리', fmtN(st.km) + 'km']);
   let cmp = '';
   if (prev) {
     const p = sessStats(prev), parts = ['횟수 ' + signed(st.reps - p.reps, '회')];
@@ -1652,7 +1715,7 @@ function openEditor(rid) {
 function editorHTML() {
   const n = edit.items.length;
   const items = edit.items.map((it, i) => {
-    const k = it.k, bw = it.type === 'bw';
+    const k = it.k, bw = it.type === 'bw', ca = isCardio(it.type);
     return '<div class="ed-item" data-k="' + k + '">' +
       '<div class="ed-r1"><span class="ed-no">' + (i + 1) + '</span>' +
         '<input id="ed-' + k + '-name" class="txt" list="ex-names" data-ed="iname" data-k="' + k + '" value="' + esc(it.name) + '" placeholder="운동 이름" autocomplete="off" aria-label="' + (i + 1) + '번 운동 이름">' +
@@ -1660,12 +1723,15 @@ function editorHTML() {
         '<button class="icon-btn xs" type="button" id="ed-' + k + '-down" data-act="ed-down" data-k="' + k + '" aria-label="아래로"' + (i === n - 1 ? ' disabled' : '') + '>' + ICON.down + '</button>' +
         '<button class="icon-btn xs" type="button" id="ed-' + k + '-rm" data-act="ed-rm" data-k="' + k + '" aria-label="이 운동 빼기">' + ICON.x + '</button></div>' +
       '<div class="ed-r2">' +
-        '<div class="seg sm" role="group" aria-label="종류"><button type="button" id="ed-' + k + '-tw" data-act="ed-type" data-k="' + k + '" data-v="weight" aria-pressed="' + !bw + '">무게</button><button type="button" id="ed-' + k + '-tb" data-act="ed-type" data-k="' + k + '" data-v="bw" aria-pressed="' + bw + '">맨몸</button></div>' +
-        '<label class="nf">세트 <input id="ed-' + k + '-sets" class="num" inputmode="numeric" data-ed="sets" data-k="' + k + '" value="' + esc(it.sets) + '"></label>' +
-        '<label class="nf">횟수 <input id="ed-' + k + '-min" class="num" inputmode="numeric" data-ed="repMin" data-k="' + k + '" value="' + esc(it.repMin) + '" aria-label="최소 횟수"> – <input id="ed-' + k + '-max" class="num" inputmode="numeric" data-ed="repMax" data-k="' + k + '" value="' + esc(it.repMax) + '" aria-label="최대 횟수"></label>' +
-        '<label class="nf">' + (bw ? '가중 단위' : '증량 단위') + ' <input id="ed-' + k + '-inc" class="num" inputmode="decimal" data-ed="inc" data-k="' + k + '" value="' + esc(it.inc) + '"> kg</label>' +
-        '<label class="nf">휴식 <input id="ed-' + k + '-rest" class="num" inputmode="numeric" data-ed="rest" data-k="' + k + '" value="' + esc(it.rest) + '" placeholder="기본"> 초</label>' +
-        '<label class="nf">주 근육 <select id="ed-' + k + '-m" class="sel" data-ed="m" data-k="' + k + '"><option value="">모름</option>' + MUSCLES.map(([mk, ml]) => '<option value="' + mk + '"' + (it.m === mk ? ' selected' : '') + '>' + ml + '</option>').join('') + '</select></label>' +
+        '<div class="seg sm" role="group" aria-label="종류">' + TYPES.map(t => '<button type="button" id="ed-' + k + '-t' + t[0] + '" data-act="ed-type" data-k="' + k + '" data-v="' + t + '" aria-pressed="' + (typeOf(it.type) === t) + '">' + TYPE_L[t] + '</button>').join('') + '</div>' +
+        (ca
+          ? '<label class="nf">구간 <input id="ed-' + k + '-sets" class="num" inputmode="numeric" data-ed="sets" data-k="' + k + '" value="' + esc(it.sets) + '"></label>' +
+            '<label class="nf">목표 시간 <input id="ed-' + k + '-min" class="num" inputmode="numeric" data-ed="repMin" data-k="' + k + '" value="' + esc(it.repMin) + '" aria-label="목표 시간 분"> 분</label>'
+          : '<label class="nf">세트 <input id="ed-' + k + '-sets" class="num" inputmode="numeric" data-ed="sets" data-k="' + k + '" value="' + esc(it.sets) + '"></label>' +
+            '<label class="nf">횟수 <input id="ed-' + k + '-min" class="num" inputmode="numeric" data-ed="repMin" data-k="' + k + '" value="' + esc(it.repMin) + '" aria-label="최소 횟수"> – <input id="ed-' + k + '-max" class="num" inputmode="numeric" data-ed="repMax" data-k="' + k + '" value="' + esc(it.repMax) + '" aria-label="최대 횟수"></label>' +
+            '<label class="nf">' + (bw ? '가중 단위' : '증량 단위') + ' <input id="ed-' + k + '-inc" class="num" inputmode="decimal" data-ed="inc" data-k="' + k + '" value="' + esc(it.inc) + '"> kg</label>' +
+            '<label class="nf">휴식 <input id="ed-' + k + '-rest" class="num" inputmode="numeric" data-ed="rest" data-k="' + k + '" value="' + esc(it.rest) + '" placeholder="기본"> 초</label>' +
+            '<label class="nf">주 근육 <select id="ed-' + k + '-m" class="sel" data-ed="m" data-k="' + k + '"><option value="">모름</option>' + MUSCLES.map(([mk, ml]) => '<option value="' + mk + '"' + (it.m === mk ? ' selected' : '') + '>' + ml + '</option>').join('') + '</select></label>') +
       '</div></div>';
   }).join('');
   return '<div class="sheet-h"><button class="btn ghost" type="button" data-act="sheet-close">취소</button><h2 id="sheet-title">' + (edit.id ? '루틴 편집' : '새 루틴') + '</h2><button class="btn primary" type="button" data-act="ed-save">저장</button></div>' +
@@ -1673,7 +1739,7 @@ function editorHTML() {
     '<input id="ed-name" class="txt" data-ed="name" value="' + esc(edit.name) + '" placeholder="예: 상체 A, 맨몸 데일리" autocomplete="off" style="margin-top:6px">' +
     '<div class="ed-items">' + items + '</div>' +
     '<button class="btn block dashed" type="button" id="ed-add" data-act="ed-add">+ 운동 추가</button>' +
-    '<p class="ed-help">세트 수와 횟수 범위가 다음 목표의 기준이에요. 모든 세트가 범위 상한을 채우면 증량 단위만큼 올라가요. 이미 있는 운동 이름을 고르면 지난 기록이 이어져요.</p>' +
+    '<p class="ed-help">세트 수와 횟수 범위가 다음 목표의 기준이에요. 모든 세트가 범위 상한을 채우면 증량 단위만큼 올라가요. 맨몸 운동은 체중에 더한 가중만 적고, 유산소는 속도와 시간을 적어요. 이미 있는 운동 이름을 고르면 지난 기록이 이어져요.</p>' +
     '<p class="err" id="ed-err" role="alert" hidden></p>' +
     (edit.id ? '<button class="btn block danger-line gap-top" type="button" data-act="ed-del">이 루틴 삭제</button>' : '') +
     '<datalist id="ex-names">' + state.exercises.map(x => '<option value="' + esc(x.name) + '"></option>').join('') + '</datalist></div>';
@@ -1685,17 +1751,26 @@ function edMove(k, d) {
   const t = edit.items[i]; edit.items[i] = edit.items[j]; edit.items[j] = t;
   refreshSheet();
 }
+// 종류를 바꿀 때 세트·횟수 기본값도 그 종류에 맞춤
+function edSetType(it, t) {
+  t = typeOf(t); if (it.type === t) return;
+  if (isCardio(t)) { it.sets = 1; it.repMin = it.repMax = 20; it.inc = 0; it.m = ''; }
+  else if (isCardio(it.type)) { it.sets = 3; it.repMin = 8; it.repMax = t === 'bw' ? 15 : 12; it.inc = 2.5; }
+  it.type = t;
+}
 function edNameChange(el) {
   const it = edItem(el.dataset.k); if (!it) return;
-  const ex = exByName(el.value);
-  if (ex) { it.type = ex.type; it.inc = ex.inc; it.m = ex.m || guessMuscles(ex.name).m || it.m; }
+  const ex = exByName(el.value), was = it.type;
+  if (ex) { edSetType(it, ex.type); it.inc = ex.inc; it.m = isCardio(ex.type) ? '' : (ex.m || guessMuscles(ex.name).m || it.m); }
+  else if (looksCardio(el.value)) edSetType(it, 'cardio');
   else { const g = guessMuscles(el.value); if (g.m) it.m = g.m; else return; }
+  // 유산소로 바뀌면 칸 구성이 달라지니 터치가 끝난 뒤에 다시 그림
+  if (isCardio(was) !== isCardio(it.type)) { setTimeout(() => { if (ui.sheet === 'editor' && edit) refreshSheet(); }, 350); return; }
   // 시트 전체를 다시 그리지 않고 해당 칸만 맞춤 (이름 입력 직후 다른 버튼을 누를 때 터치가 씹히지 않게)
   const $k = s => document.getElementById('ed-' + it.k + '-' + s), bw = it.type === 'bw';
-  const m = $k('m'), inc = $k('inc'), tw = $k('tw'), tb = $k('tb');
+  const m = $k('m'), inc = $k('inc');
   if (m) m.value = it.m || '';
-  if (tw) tw.setAttribute('aria-pressed', String(!bw));
-  if (tb) tb.setAttribute('aria-pressed', String(bw));
+  TYPES.forEach(t => { const b = $k('t' + t[0]); if (b) b.setAttribute('aria-pressed', String(it.type === t)); });
   if (inc) { inc.value = it.inc; if (inc.parentNode.firstChild.nodeType === 3) inc.parentNode.firstChild.textContent = (bw ? '가중 단위' : '증량 단위') + ' '; }
 }
 function gcExercises() {
@@ -1714,11 +1789,12 @@ function edSave() {
     let ex = it.exId ? exById(it.exId) : null;
     if (!ex || norm(ex.name) !== norm(nm)) ex = exByName(nm);
     const n = num(it.inc), inc = Math.min(100, Math.max(0, r2(n == null ? 2.5 : n)));
-    const type = it.type === 'bw' ? 'bw' : 'weight';
-    const g = guessMuscles(nm), m = MLABEL[it.m] ? it.m : (g.m || null);
+    const type = typeOf(it.type), ca = isCardio(type);
+    const g = ca ? { m: null, s: [] } : guessMuscles(nm), m = ca ? null : MLABEL[it.m] ? it.m : (g.m || null);
     const secFor = mm => g.m === mm ? g.s.slice() : [];
     if (!ex) { ex = { id: uid(), name: nm, type, inc, m, s: m && g.m === m ? g.s.slice() : [] }; state.exercises.push(ex); }
-    else { ex.type = type; ex.inc = inc; if (m && ex.m !== m) { ex.m = m; ex.s = secFor(m); } }
+    else { ex.type = type; ex.inc = ca ? 0 : inc; if (ca) { ex.m = null; ex.s = []; } else if (m && ex.m !== m) { ex.m = m; ex.s = secFor(m); } }
+    if (ca) { const mins = clampInt(it.repMin, 1, 600, 20); items.push({ exId: ex.id, sets: clampInt(it.sets, 1, 20, 1), repMin: mins, repMax: mins }); continue; }
     let a = clampInt(it.repMin, 1, 200, 8), b = clampInt(it.repMax, 1, 200, 12);
     if (b < a) { const t = a; a = b; b = t; }
     const item = { exId: ex.id, sets: clampInt(it.sets, 1, 20, 3), repMin: a, repMax: b };
@@ -1748,12 +1824,12 @@ function openXs(id) {
   openSheet('xs', xsHTML());
 }
 function xsHTML() {
-  const x = ui.xs, bw = x.type === 'bw';
+  const x = ui.xs, bw = x.type === 'bw', ca = isCardio(x.type);
   return '<div class="sheet-h"><button class="btn ghost" type="button" data-act="sheet-close">취소</button><h2 id="sheet-title">운동 설정</h2><button class="btn primary" type="button" data-act="xs-save">저장</button></div>' +
     '<div class="sheet-b srows">' +
     '<section class="srow"><label class="lbl" for="xs-name">이름</label><input id="xs-name" class="txt" data-xs="name" value="' + esc(x.name) + '" autocomplete="off"><p>이름을 바꿔도 지난 기록은 그대로 이어져요.</p></section>' +
-    '<section class="srow"><h3>종류</h3><div class="seg" role="group" aria-label="종류"><button type="button" id="xs-tw" data-act="xs-type" data-v="weight" aria-pressed="' + !bw + '">무게</button><button type="button" id="xs-tb" data-act="xs-type" data-v="bw" aria-pressed="' + bw + '">맨몸</button></div><p>맨몸 운동은 무게 칸에 추가한 가중(kg)만 적어요.</p></section>' +
-    '<section class="srow"><label class="lbl" for="xs-inc">' + (bw ? '가중 단위' : '증량 단위') + ' (kg)</label><input id="xs-inc" class="num wide" inputmode="decimal" data-xs="inc" value="' + esc(x.inc) + '"><p>모든 세트가 범위 상한을 채웠을 때 올릴 무게예요.</p></section>' +
+    '<section class="srow"><h3>종류</h3><div class="seg" role="group" aria-label="종류">' + typeSeg(x.type, t => 'id="xs-t' + t[0] + '" data-act="xs-type" data-v="' + t + '"') + '</div><p>' + (ca ? '유산소는 속도(km/h)와 시간(분)을 적고, 거리는 자동으로 계산해요.' : '맨몸 운동은 체중을 기본으로 잡고, 무게 칸에는 더한 가중(kg)만 적어요.') + '</p></section>' +
+    (ca ? '' : '<section class="srow"><label class="lbl" for="xs-inc">' + (bw ? '가중 단위' : '증량 단위') + ' (kg)</label><input id="xs-inc" class="num wide" inputmode="decimal" data-xs="inc" value="' + esc(x.inc) + '"><p>모든 세트가 범위 상한을 채웠을 때 올릴 무게예요.</p></section>') +
     '<p class="err" id="xs-err" role="alert" hidden></p></div>';
 }
 function saveXs() {
@@ -1763,7 +1839,8 @@ function saveXs() {
   if (!nm) { err.textContent = '이름을 입력해 주세요.'; err.hidden = false; return; }
   if (state.exercises.some(o => o.id !== ex.id && norm(o.name) === norm(nm))) { err.textContent = '같은 이름의 운동이 이미 있어요.'; err.hidden = false; return; }
   const n = num(x.inc);
-  ex.name = nm; ex.type = x.type === 'bw' ? 'bw' : 'weight'; ex.inc = Math.min(100, Math.max(0, r2(n == null ? ex.inc : n)));
+  ex.name = nm; ex.type = typeOf(x.type); ex.inc = isCardio(ex.type) ? 0 : Math.min(100, Math.max(0, r2(n == null ? ex.inc : n)));
+  if (isCardio(ex.type)) { ex.m = null; ex.s = []; }
   saveApp(); closeSheet(); render(); toast('운동 설정을 바꿨어요');
 }
 
@@ -1822,7 +1899,7 @@ function sanitizeImport(d) {
   if (!d || typeof d !== 'object' || !Array.isArray(d.exercises) || !Array.isArray(d.routines)) throw new Error('shape');
   const exercises = d.exercises.filter(x => x && x.id && x.name).map(x => {
     const n = num(x.inc);
-    return { id: String(x.id), name: String(x.name).slice(0, 60), type: x.type === 'bw' ? 'bw' : 'weight', inc: Math.min(100, Math.max(0, n == null ? 2.5 : n)) };
+    return { id: String(x.id), name: String(x.name).slice(0, 60), type: typeOf(x.type), inc: Math.min(100, Math.max(0, n == null ? 2.5 : n)) };
   });
   const ids = new Set(exercises.map(x => x.id));
   const rawSess = Array.isArray(d.sessions) ? d.sessions : (d.months && typeof d.months === 'object' ? Object.values(d.months).flat() : []);
@@ -1830,11 +1907,12 @@ function sanitizeImport(d) {
     id: String(s.id || uid()), routineId: s.routineId ? String(s.routineId) : null, routineName: String(s.routineName || '자유 운동'),
     start: s.start, end: Number.isFinite(s.end) ? s.end : s.start,
     entries: s.entries.filter(e => e && e.exId && Array.isArray(e.sets)).map(e => ({
-      exId: String(e.exId), name: String(e.name || ''), type: e.type === 'bw' ? 'bw' : 'weight',
+      exId: String(e.exId), name: String(e.name || ''), type: typeOf(e.type),
       target: e.target && typeof e.target === 'object' ? { sets: clampInt(e.target.sets, 1, 20, 3), repMin: clampInt(e.target.repMin, 1, 200, 8), repMax: clampInt(e.target.repMax, 1, 200, 12) } : null,
       sets: e.sets.filter(x => x && num(x.r) > 0).map(x => ({ w: Math.max(0, num(x.w) || 0), r: Math.round(num(x.r)) }))
     })).filter(e => e.sets.length),
-    prs: Array.isArray(s.prs) ? s.prs.filter(p => p && p.exId && p.label).map(p => ({ exId: String(p.exId), label: String(p.label).slice(0, 40) })) : []
+    prs: Array.isArray(s.prs) ? s.prs.filter(p => p && p.exId && p.label).map(p => ({ exId: String(p.exId), label: String(p.label).slice(0, 40) })) : [],
+    ...(Number.isFinite(s.bw) && s.bw > 0 ? { bw: s.bw } : {})
   }));
   for (const s of list) for (const e of s.entries) if (!ids.has(e.exId)) { ids.add(e.exId); exercises.push({ id: e.exId, name: e.name || '운동', type: e.type, inc: 2.5 }); }
   const routines = d.routines.filter(r => r && r.id && Array.isArray(r.items)).map(r => Object.assign({
@@ -1895,6 +1973,7 @@ function applyImport(d) {
 function guessMuscles(name) { const n = String(name || ''); for (const [re, m, s] of GUESS) if (re.test(n)) return { m, s: s.slice() }; return { m: null, s: [] }; }
 function musclesOf(exId, fallbackName) {
   const ex = exById(exId);
+  if (ex && isCardio(ex.type)) return { m: null, s: [] };
   if (ex && ex.m) return { m: ex.m, s: Array.isArray(ex.s) ? ex.s : [] };
   return guessMuscles(ex ? ex.name : fallbackName);
 }
@@ -1908,7 +1987,7 @@ function weeklyFrom(items) {
 }
 function weekVolume(from, to) {
   const items = [];
-  sessions().forEach(s => { if (s.start < from || s.start >= to) return; s.entries.forEach(e => { const mm = musclesOf(e.exId, e.name); items.push({ m: mm.m, s: mm.s, sets: (e.sets || []).length }); }); });
+  sessions().forEach(s => { if (s.start < from || s.start >= to) return; s.entries.forEach(e => { if (isCardio(e.type)) return; const mm = musclesOf(e.exId, e.name); items.push({ m: mm.m, s: mm.s, sets: (e.sets || []).length }); }); });
   return weeklyFrom(items);
 }
 function routineMuscles() {
@@ -2420,7 +2499,7 @@ document.addEventListener('click', ev => {
     case 'delset': delSet(e); break;
     case 'rmex': rmEx(e); break;
     case 'addex-open': ui.addEx = true; ui.addExName = ''; render(); focusLater('addex-name'); break;
-    case 'addex-type': ui.addExType = v === 'bw' ? 'bw' : 'weight'; render(); break;
+    case 'addex-type': ui.addExType = typeOf(v); render(); break;
     case 'addex-cancel': ui.addEx = false; render(); break;
     case 'addex-ok': addExToSession(); break;
     case 'finish': finish(); break;
@@ -2429,7 +2508,7 @@ document.addEventListener('click', ev => {
     case 'rest-skip': stopRest(); break;
     case 'new-routine': openEditor(null); break;
     case 'edit': openEditor(id); break;
-    case 'ed-type': { const it = edItem(k); if (it) { it.type = v === 'bw' ? 'bw' : 'weight'; refreshSheet(); } break; }
+    case 'ed-type': { const it = edItem(k); if (it) { edSetType(it, v); refreshSheet(); } break; }
     case 'ed-up': edMove(k, -1); break;
     case 'ed-down': edMove(k, 1); break;
     case 'ed-rm': edit.items = edit.items.filter(x => x.k !== k); if (!edit.items.length) edit.items.push(blankItem()); refreshSheet(); break;
@@ -2445,7 +2524,7 @@ document.addEventListener('click', ev => {
     case 'pick-ex': ui.progEx = id; ui.metric = null; render(); break;
     case 'metric': ui.metric = v; render(); break;
     case 'xs-open': openXs(id); break;
-    case 'xs-type': if (ui.xs) { ui.xs.type = v === 'bw' ? 'bw' : 'weight'; refreshSheet(); } break;
+    case 'xs-type': if (ui.xs) { ui.xs.type = typeOf(v); refreshSheet(); } break;
     case 'xs-save': saveXs(); break;
     case 'cal-prev': case 'cal-next': { const d = new Date(ui.calMonth || Date.now()); ui.calMonth = new Date(d.getFullYear(), d.getMonth() + (a === 'cal-next' ? 1 : -1), 1).getTime(); render(); break; }
     case 'cal-pick': ui.calDay = v; render(); break;
@@ -2531,7 +2610,7 @@ boot();
 
 <script>
 // 오프라인 사용을 위한 서비스 워커와, 기기 저장 공간이 지워지지 않도록 요청
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=d3dafdd528').catch(() => {}));
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=adbe1857fc').catch(() => {}));
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 </script>
 </body>
