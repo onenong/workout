@@ -158,6 +158,16 @@ body.has-rest main.wrap{padding-bottom:calc(var(--tabbar-h) + 112px)}
 .plan li{display:flex;align-items:center;justify-content:space-between;gap:6px 12px;flex-wrap:wrap;padding:9px 0;border-top:1px solid var(--line)}
 .plan li:first-child{border-top:0;padding-top:2px}
 .pn{font-weight:500;min-width:0;overflow-wrap:anywhere}
+.plan li.pl{display:block;padding:0}
+.pl-h{appearance:none;display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:46px;padding:7px 0;border:0;background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.plan li.pl:first-child .pl-h{padding-top:0}
+.chev{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--sunk);color:var(--ink-2)}
+.chev .ic,.ed-tg .ic{width:17px;height:17px;transition:transform .18s}
+.pl-h[aria-expanded="true"] .chev{background:var(--ink);color:var(--on-ink)}
+.pl-h[aria-expanded="true"] .chev .ic,.ed-tg[aria-expanded="true"] .ic{transform:rotate(180deg)}
+.pdet{display:grid;gap:12px;padding:2px 0 14px}
+.pd-next{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--ink-2)}
+.pd-f{display:flex;flex-wrap:wrap;gap:10px 14px}
 .rules{margin-top:18px;padding:4px 14px;border-radius:14px;background:var(--sunk)}
 .rules summary{cursor:pointer;padding:10px 0;font-weight:600;font-size:14px;color:var(--ink-2)}
 .rules ul{list-style:none;padding:0;display:grid;gap:12px;margin:4px 0 12px}
@@ -333,6 +343,10 @@ body.has-rest main.wrap{padding-bottom:calc(var(--tabbar-h) + 112px)}
 .ed-r1 .txt{flex:1 1 auto;min-width:0;margin-right:2px}
 .ed-no{flex:none;width:24px;text-align:center;font:700 20px/1 var(--f-num);color:var(--ink-3)}
 .ed-r2{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;padding-left:28px}
+.ed-d{display:grid;gap:12px}
+.ed-r3{display:flex;align-items:center;gap:6px;padding-left:28px}
+.ed-r3 .btn{margin-left:auto}
+.ed-tg[aria-expanded="true"]{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
 .nf{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);white-space:nowrap}
 .num{width:56px;height:40px;padding:0 4px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink);text-align:center;font:600 18px/1 var(--f-num);font-variant-numeric:tabular-nums}
 .num.wide{width:110px}
@@ -578,6 +592,7 @@ const ICON = {
   edit: ic('<path d="M4.5 19.5h4l10-10-4-4-10 10z"/><path d="M13 7l4 4"/>'),
   up: ic('<path d="M12 18V6.5M7 11.5l5-5 5 5"/>'),
   down: ic('<path d="M12 6v11.5M7 12.5l5 5 5-5"/>'),
+  chev: ic('<path d="M6.5 9.5l5.5 5.5 5.5-5.5"/>'),
   coach: ic('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>'),
   protein: ic('<path d="M8.5 3h7v3l1.5 2.5V20a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V8.5L8.5 6z"/><path d="M8.5 6h7M7 12h10"/>'),
   plus: ic('<path d="M12 5.5v13M5.5 12h13"/>')
@@ -619,11 +634,11 @@ const EVIDENCE = [
 ];
 
 /* ── 단백질: 음식 데이터 ───────────────────────── */
-const FOOD_SRC = { mfds: '식약처 식품성분 DB', ex: '대한당뇨병학회 식품교환표', lab: 'ProteinLab 음료 DB (2026.11 확인)', label: '제품 영양 정보' };
+const FOOD_SRC = { mfds: '식약처 식품성분 DB', ex: '대한당뇨병학회 식품교환표', lab: 'ProteinLab 음료 DB (2026.11 확인)', label: '제품 영양 정보', d20: '식약처 식품영양성분 자료집 (2020)', d19: '식약처 외식영양성분자료집 통합본 (2019)' };
 const P_FACTORS = [1.6, 1.8, 2, 2.2];
 const P_X = [0.5, 1, 1.5, 2, 3];
 const P_LIMIT = 8;
-const PCATS = [['recent', '자주 먹는'], ['food', '음식'], ['drink', '단백질 음료'], ['powder', '단백질 파우더'], ['mine', '내 음식']];
+const PCATS = [['recent', '자주 먹는'], ['food', '식재료'], ['kr', '한식'], ['cn', '중식'], ['jp', '일식·아시안'], ['we', '양식'], ['bs', '분식'], ['drink', '단백질 음료'], ['powder', '단백질 파우더'], ['mine', '내 음식']];
 // c: 분류, s: 1회 기준, q·u: 1회 기준량과 단위(g·ml, 모르면 null), p: 1회 단백질(g)
 const FOODS = [
   { k: 'chicken_breast', n: '닭가슴살 (삶은 것)', c: 'food', s: '1팩 100g', q: 100, u: 'g', p: 23.1, src: 'mfds' },
@@ -669,6 +684,163 @@ const FOODS = [
   { k: 'lowfat_milk', n: '저지방 우유', c: 'food', s: '1컵 200ml', q: 200, u: 'ml', p: 6, src: 'ex' },
   { k: 'soy_milk', n: '두유', c: 'food', s: '1컵 200ml', q: 200, u: 'ml', p: 6, src: 'ex' },
   { k: 'ramen', n: '라면 (신라면 1봉 기준)', c: 'food', s: '1봉 120g', q: 120, u: 'g', p: 10, src: 'label' },
+  // 메뉴 1인분: 식약처 식품영양성분 자료집(2020)·외식영양성분자료집 통합본(2019), NOFAT 음식 분류에서 옮김. k = 자료 코드
+  { k: 'D018204', n: '비빔밥', c: 'kr', s: '1인분 450g', q: 450, u: 'g', p: 30.9, src: 'd20' },
+  { k: 'D018197', n: '돌솥비빔밥', c: 'kr', s: '1인분 380g', q: 380, u: 'g', p: 20.5, src: 'd20' },
+  { k: 'D018219', n: '육회비빔밥', c: 'kr', s: '1인분 300g', q: 300, u: 'g', p: 19.2, src: 'd20' },
+  { k: 'D018222', n: '제육덮밥', c: 'kr', s: '1인분 470g', q: 470, u: 'g', p: 44.3, src: 'd20' },
+  { k: 'D018203', n: '불고기덮밥', c: 'kr', s: '1인분 400g', q: 400, u: 'g', p: 26.4, src: 'd20' },
+  { k: 'D018216', n: '오징어덮밥', c: 'kr', s: '1인분 360g', q: 360, u: 'g', p: 25.9, src: 'd20' },
+  { k: 'D018193', n: '낙지덮밥', c: 'kr', s: '1인분 350g', q: 350, u: 'g', p: 20.6, src: 'd20' },
+  { k: 'D000261', n: '회덮밥', c: 'kr', s: '1인분 500g', q: 500, u: 'g', p: 30.2, src: 'd19' },
+  { k: 'D018192', n: '김치볶음밥', c: 'kr', s: '1인분 330g', q: 330, u: 'g', p: 17.6, src: 'd20' },
+  { k: 'D018212', n: '순대국밥', c: 'kr', s: '1인분 900g', q: 900, u: 'g', p: 28.6, src: 'd20' },
+  { k: 'D000213', n: '돼지국밥', c: 'kr', s: '1인분 1200g', q: 1200, u: 'g', p: 66.4, src: 'd19' },
+  { k: 'D000230', n: '소고기국밥', c: 'kr', s: '1인분 700g', q: 700, u: 'g', p: 21.8, src: 'd19' },
+  { k: 'D018234', n: '콩나물국밥', c: 'kr', s: '1인분 780g', q: 780, u: 'g', p: 11.3, src: 'd20' },
+  { k: 'D018239', n: '현미밥', c: 'kr', s: '1공기 230g', q: 230, u: 'g', p: 7.1, src: 'd20' },
+  { k: 'D018461', n: '전복죽', c: 'kr', s: '1인분 400g', q: 400, u: 'g', p: 7.3, src: 'd20' },
+  { k: 'D018457', n: '닭죽', c: 'kr', s: '1인분 400g', q: 400, u: 'g', p: 10.7, src: 'd20' },
+  { k: 'D000385', n: '김치찌개', c: 'kr', s: '1인분 400g', q: 400, u: 'g', p: 15.1, src: 'd19' },
+  { k: 'D018500', n: '참치김치찌개', c: 'kr', s: '1인분 300g', q: 300, u: 'g', p: 10.8, src: 'd20' },
+  { k: 'D018480', n: '된장찌개', c: 'kr', s: '1인분 200g', q: 200, u: 'g', p: 6.8, src: 'd20' },
+  { k: 'D018492', n: '순두부찌개', c: 'kr', s: '1인분 200g', q: 200, u: 'g', p: 9.1, src: 'd20' },
+  { k: 'D018487', n: '부대찌개', c: 'kr', s: '1인분 600g', q: 600, u: 'g', p: 35.2, src: 'd20' },
+  { k: 'D018501', n: '청국장찌개', c: 'kr', s: '1인분 200g', q: 200, u: 'g', p: 10.1, src: 'd20' },
+  { k: 'D018504', n: '콩비지찌개', c: 'kr', s: '1인분 400g', q: 400, u: 'g', p: 26.9, src: 'd20' },
+  { k: 'D018477', n: '동태찌개', c: 'kr', s: '1인분 200g', q: 200, u: 'g', p: 12.2, src: 'd20' },
+  { k: 'D018467', n: '감자탕', c: 'kr', s: '1인분 530g', q: 530, u: 'g', p: 33.4, src: 'd20' },
+  { k: 'D018475', n: '닭볶음탕', c: 'kr', s: '1인분 300g', q: 300, u: 'g', p: 35.7, src: 'd20' },
+  { k: 'D018493', n: '알탕', c: 'kr', s: '1인분 520g', q: 520, u: 'g', p: 33.1, src: 'd20' },
+  { k: 'D000076', n: '소고기 샤브샤브', c: 'kr', s: '1인분 600g', q: 600, u: 'g', p: 29.1, src: 'd19' },
+  { k: 'D018053', n: '갈비탕', c: 'kr', s: '1인분 670g', q: 670, u: 'g', p: 57, src: 'd20' },
+  { k: 'D018083', n: '설렁탕', c: 'kr', s: '1인분 500g', q: 500, u: 'g', p: 21.3, src: 'd20' },
+  { k: 'D018056', n: '곰탕', c: 'kr', s: '1인분 600g', q: 600, u: 'g', p: 20.6, src: 'd20' },
+  { k: 'D018079', n: '삼계탕', c: 'kr', s: '1인분 900g', q: 900, u: 'g', p: 96.1, src: 'd20' },
+  { k: 'D018065', n: '닭곰탕', c: 'kr', s: '1인분 650g', q: 650, u: 'g', p: 48.8, src: 'd20' },
+  { k: 'D018067', n: '도가니탕', c: 'kr', s: '1인분 500g', q: 500, u: 'g', p: 41.8, src: 'd20' },
+  { k: 'D018099', n: '육개장', c: 'kr', s: '1인분 440g', q: 440, u: 'g', p: 16.2, src: 'd20' },
+  { k: 'D018077', n: '뼈해장국', c: 'kr', s: '1인분 800g', q: 800, u: 'g', p: 25.6, src: 'd20' },
+  { k: 'D018085', n: '소고기미역국', c: 'kr', s: '1그릇 400g', q: 400, u: 'g', p: 7.4, src: 'd20' },
+  { k: 'D018076', n: '북엇국', c: 'kr', s: '1그릇 400g', q: 400, u: 'g', p: 15.6, src: 'd20' },
+  { k: 'D018160', n: '떡국', c: 'kr', s: '1인분 700g', q: 700, u: 'g', p: 24, src: 'd20' },
+  { k: 'D000037', n: '만둣국', c: 'kr', s: '1인분 700g', q: 700, u: 'g', p: 21.4, src: 'd19' },
+  { k: 'D018502', n: '추어탕', c: 'kr', s: '1인분 350g', q: 350, u: 'g', p: 11.3, src: 'd20' },
+  { k: 'D018476', n: '대구 매운탕', c: 'kr', s: '1인분 600g', q: 600, u: 'g', p: 27, src: 'd20' },
+  { k: 'D000461', n: '해물탕', c: 'kr', s: '1인분 600g', q: 600, u: 'g', p: 39.8, src: 'd19' },
+  { k: 'D018033', n: '삼겹살구이', c: 'kr', s: '1인분 200g', q: 200, u: 'g', p: 45.1, src: 'd20' },
+  { k: 'D018039', n: '소불고기', c: 'kr', s: '1인분 200g', q: 200, u: 'g', p: 32.8, src: 'd20' },
+  { k: 'D018027', n: '돼지불고기', c: 'kr', s: '1인분 200g', q: 200, u: 'g', p: 29.7, src: 'd20' },
+  { k: 'D018025', n: '돼지갈비구이', c: 'kr', s: '1인분 300g', q: 300, u: 'g', p: 84.7, src: 'd20' },
+  { k: 'D000007', n: '닭갈비', c: 'kr', s: '1인분 400g', q: 400, u: 'g', p: 45.9, src: 'd19' },
+  { k: 'D018288', n: '제육볶음', c: 'kr', s: '1인분 250g', q: 250, u: 'g', p: 30.4, src: 'd20' },
+  { k: 'D000281', n: '오삼불고기', c: 'kr', s: '1인분 200g', q: 200, u: 'g', p: 25.6, src: 'd19' },
+  { k: 'D018516', n: '돼지고기 수육 (보쌈)', c: 'kr', s: '1인분 300g', q: 300, u: 'g', p: 59.6, src: 'd20' },
+  { k: 'D018523', n: '족발', c: 'kr', s: '1인분 250g', q: 250, u: 'g', p: 65.1, src: 'd20' },
+  { k: 'D018517', n: '소갈비찜', c: 'kr', s: '1인분 300g', q: 300, u: 'g', p: 21.8, src: 'd20' },
+  { k: 'D018515', n: '돼지갈비찜', c: 'kr', s: '1인분 300g', q: 300, u: 'g', p: 39.9, src: 'd20' },
+  { k: 'D018514', n: '닭찜', c: 'kr', s: '1인분 300g', q: 300, u: 'g', p: 37.1, src: 'd20' },
+  { k: 'D000027', n: '훈제오리', c: 'kr', s: '1회 250g', q: 250, u: 'g', p: 43.1, src: 'd19' },
+  { k: 'D018384', n: '육회', c: 'kr', s: '1회 150g', q: 150, u: 'g', p: 14.9, src: 'd20' },
+  { k: 'D018018', n: '고등어구이', c: 'kr', s: '1회 200g', q: 200, u: 'g', p: 47.6, src: 'd20' },
+  { k: 'D018017', n: '갈치구이', c: 'kr', s: '1회 200g', q: 200, u: 'g', p: 43.1, src: 'd20' },
+  { k: 'D018034', n: '삼치구이', c: 'kr', s: '1회 200g', q: 200, u: 'g', p: 42.8, src: 'd20' },
+  { k: 'D018044', n: '조기구이', c: 'kr', s: '1회 180g', q: 180, u: 'g', p: 34.8, src: 'd20' },
+  { k: 'D018429', n: '고등어조림', c: 'kr', s: '1회 100g', q: 100, u: 'g', p: 11.2, src: 'd20' },
+  { k: 'D018279', n: '오징어볶음', c: 'kr', s: '1인분 200g', q: 200, u: 'g', p: 19.7, src: 'd20' },
+  { k: 'D018247', n: '낙지볶음', c: 'kr', s: '1인분 200g', q: 200, u: 'g', p: 11.5, src: 'd20' },
+  { k: 'D000285', n: '주꾸미볶음', c: 'kr', s: '1인분 200g', q: 200, u: 'g', p: 18.3, src: 'd19' },
+  { k: 'D018521', n: '아귀찜', c: 'kr', s: '1인분 200g', q: 200, u: 'g', p: 13.4, src: 'd20' },
+  { k: 'D000074', n: '물회', c: 'kr', s: '1인분 700g', q: 700, u: 'g', p: 34.4, src: 'd19' },
+  { k: 'D018435', n: '돼지고기 장조림', c: 'kr', s: '1회 100g', q: 100, u: 'g', p: 15.6, src: 'd20' },
+  { k: 'D000342', n: '동그랑땡', c: 'kr', s: '1회 150g', q: 150, u: 'g', p: 19.6, src: 'd19' },
+  { k: 'D018402', n: '계란말이', c: 'kr', s: '1회 100g', q: 100, u: 'g', p: 17.2, src: 'd20' },
+  { k: 'D018403', n: '계란후라이', c: 'kr', s: '1개 60g', q: 60, u: 'g', p: 9.4, src: 'd20' },
+  { k: 'D018405', n: '두부부침', c: 'kr', s: '1회 100g', q: 100, u: 'g', p: 10.9, src: 'd20' },
+  { k: 'D018263', n: '멸치볶음', c: 'kr', s: '1회 50g', q: 50, u: 'g', p: 19.7, src: 'd20' },
+  { k: 'D018417', n: '해물파전', c: 'kr', s: '1회 150g', q: 150, u: 'g', p: 8.2, src: 'd20' },
+  { k: 'D018401', n: '김치전', c: 'kr', s: '1회 150g', q: 150, u: 'g', p: 7.6, src: 'd20' },
+  { k: 'D018183', n: '칼국수', c: 'kr', s: '1인분 700g', q: 700, u: 'g', p: 23.1, src: 'd20' },
+  { k: 'D018170', n: '바지락칼국수', c: 'kr', s: '1인분 700g', q: 700, u: 'g', p: 24, src: 'd20' },
+  { k: 'D000142', n: '닭칼국수', c: 'kr', s: '1인분 900g', q: 900, u: 'g', p: 42.2, src: 'd19' },
+  { k: 'D018167', n: '물냉면', c: 'kr', s: '1인분 700g', q: 700, u: 'g', p: 13.8, src: 'd20' },
+  { k: 'D018173', n: '비빔냉면', c: 'kr', s: '1인분 500g', q: 500, u: 'g', p: 28.3, src: 'd20' },
+  { k: 'D018178', n: '잔치국수', c: 'kr', s: '1인분 700g', q: 700, u: 'g', p: 13.5, src: 'd20' },
+  { k: 'D018172', n: '비빔국수', c: 'kr', s: '1인분 500g', q: 500, u: 'g', p: 15.1, src: 'd20' },
+  { k: 'D018184', n: '콩국수', c: 'kr', s: '1인분 800g', q: 800, u: 'g', p: 31.2, src: 'd20' },
+  { k: 'D018164', n: '막국수', c: 'kr', s: '1인분 600g', q: 600, u: 'g', p: 34.8, src: 'd20' },
+  { k: 'D018180', n: '짜장면', c: 'cn', s: '1인분 600g', q: 600, u: 'g', p: 16.1, src: 'd20' },
+  { k: 'D018155', n: '간짜장', c: 'cn', s: '1인분 500g', q: 500, u: 'g', p: 25.6, src: 'd20' },
+  { k: 'D018181', n: '짬뽕', c: 'cn', s: '1인분 800g', q: 800, u: 'g', p: 22.3, src: 'd20' },
+  { k: 'D000154', n: '삼선짬뽕', c: 'cn', s: '1인분 900g', q: 900, u: 'g', p: 39.6, src: 'd19' },
+  { k: 'D018224', n: '짬뽕밥', c: 'cn', s: '1인분 900g', q: 900, u: 'g', p: 28.8, src: 'd20' },
+  { k: 'D018223', n: '짜장밥', c: 'cn', s: '1인분 470g', q: 470, u: 'g', p: 20.1, src: 'd20' },
+  { k: 'D018221', n: '잡채밥', c: 'cn', s: '1인분 550g', q: 550, u: 'g', p: 22.1, src: 'd20' },
+  { k: 'D000245', n: '잡탕밥', c: 'cn', s: '1인분 750g', q: 750, u: 'g', p: 44.1, src: 'd19' },
+  { k: 'D018202', n: '볶음밥', c: 'cn', s: '1인분 350g', q: 350, u: 'g', p: 19.5, src: 'd20' },
+  { k: 'D018205', n: '새우볶음밥', c: 'cn', s: '1인분 370g', q: 370, u: 'g', p: 23.3, src: 'd20' },
+  { k: 'D018546', n: '탕수육', c: 'cn', s: '1회 200g', q: 200, u: 'g', p: 27.2, src: 'd20' },
+  { k: 'D018533', n: '깐풍기', c: 'cn', s: '1회 150g', q: 150, u: 'g', p: 18.9, src: 'd20' },
+  { k: 'D000072', n: '라조기', c: 'cn', s: '1회 200g', q: 200, u: 'g', p: 20.7, src: 'd19' },
+  { k: 'D000070', n: '난자완스', c: 'cn', s: '1회 200g', q: 200, u: 'g', p: 21.6, src: 'd19' },
+  { k: 'D000229', n: '모둠초밥', c: 'jp', s: '1인분 300g', q: 300, u: 'g', p: 25.4, src: 'd19' },
+  { k: 'D000237', n: '연어초밥', c: 'jp', s: '1인분 250g', q: 250, u: 'g', p: 18.9, src: 'd19' },
+  { k: 'D000228', n: '광어초밥', c: 'jp', s: '1인분 300g', q: 300, u: 'g', p: 27.1, src: 'd19' },
+  { k: 'D018218', n: '유부초밥', c: 'jp', s: '1인분 200g', q: 200, u: 'g', p: 11.6, src: 'd20' },
+  { k: 'D000256', n: '캘리포니아롤', c: 'jp', s: '1인분 300g', q: 300, u: 'g', p: 12.3, src: 'd19' },
+  { k: 'D000236', n: '연어롤', c: 'jp', s: '1인분 300g', q: 300, u: 'g', p: 18.6, src: 'd19' },
+  { k: 'D018176', n: '우동', c: 'jp', s: '1인분 800g', q: 800, u: 'g', p: 14.3, src: 'd20' },
+  { k: 'D018171', n: '볶음우동', c: 'jp', s: '1인분 300g', q: 300, u: 'g', p: 8.4, src: 'd20' },
+  { k: 'D018166', n: '메밀국수 (소바)', c: 'jp', s: '1인분 350g', q: 350, u: 'g', p: 11, src: 'd20' },
+  { k: 'D018537', n: '등심돈까스', c: 'jp', s: '1인분 200g', q: 200, u: 'g', p: 33.8, src: 'd20' },
+  { k: 'D000474', n: '안심돈까스', c: 'jp', s: '1인분 200g', q: 200, u: 'g', p: 33.3, src: 'd19' },
+  { k: 'D000479', n: '치즈돈까스', c: 'jp', s: '1인분 250g', q: 250, u: 'g', p: 42, src: 'd19' },
+  { k: 'D018233', n: '카레라이스', c: 'jp', s: '1인분 480g', q: 480, u: 'g', p: 14.9, src: 'd20' },
+  { k: 'D018215', n: '오므라이스', c: 'jp', s: '1인분 400g', q: 400, u: 'g', p: 26, src: 'd20' },
+  { k: 'D000246', n: '장어덮밥', c: 'jp', s: '1인분 400g', q: 400, u: 'g', p: 30.1, src: 'd19' },
+  { k: 'D018048', n: '치킨데리야끼', c: 'jp', s: '1인분 340g', q: 340, u: 'g', p: 56.2, src: 'd20' },
+  { k: 'D000156', n: '쌀국수', c: 'jp', s: '1인분 600g', q: 600, u: 'g', p: 15.6, src: 'd19' },
+  { k: 'D018326', n: '햄버거', c: 'we', s: '1개 200g', q: 200, u: 'g', p: 25.7, src: 'd20' },
+  { k: 'D018308', n: '불고기버거', c: 'we', s: '1개 200g', q: 200, u: 'g', p: 27.8, src: 'd20' },
+  { k: 'D018320', n: '치킨버거', c: 'we', s: '1개 200g', q: 200, u: 'g', p: 24.9, src: 'd20' },
+  { k: 'D000304', n: '치즈피자', c: 'we', s: '1회 200g', q: 200, u: 'g', p: 31.4, src: 'd19' },
+  { k: 'D000309', n: '페퍼로니피자', c: 'we', s: '1회 200g', q: 200, u: 'g', p: 29.4, src: 'd19' },
+  { k: 'D000297', n: '불고기피자', c: 'we', s: '1회 200g', q: 200, u: 'g', p: 27.4, src: 'd19' },
+  { k: 'D018322', n: '콤비네이션피자', c: 'we', s: '1회 200g', q: 200, u: 'g', p: 21.4, src: 'd20' },
+  { k: 'D000172', n: '토마토 스파게티', c: 'we', s: '1인분 500g', q: 500, u: 'g', p: 24.4, src: 'd19' },
+  { k: 'D000171', n: '크림 스파게티', c: 'we', s: '1인분 400g', q: 400, u: 'g', p: 21.8, src: 'd19' },
+  { k: 'D018028', n: '등심스테이크', c: 'we', s: '1인분 200g', q: 200, u: 'g', p: 60.4, src: 'd20' },
+  { k: 'D018040', n: '안심스테이크', c: 'we', s: '1인분 200g', q: 200, u: 'g', p: 69.6, src: 'd20' },
+  { k: 'D018051', n: '함박스테이크', c: 'we', s: '1인분 200g', q: 200, u: 'g', p: 24.2, src: 'd20' },
+  { k: 'D018547', n: '후라이드치킨', c: 'we', s: '1회 200g', q: 200, u: 'g', p: 35.5, src: 'd20' },
+  { k: 'D000475', n: '양념치킨', c: 'we', s: '1회 200g', q: 200, u: 'g', p: 35.5, src: 'd19' },
+  { k: 'D018528', n: '간장치킨', c: 'we', s: '1회 200g', q: 200, u: 'g', p: 20.5, src: 'd20' },
+  { k: 'D018545', n: '치킨너겟', c: 'we', s: '1회 150g', q: 150, u: 'g', p: 22.5, src: 'd20' },
+  { k: 'D018299', n: '닭가슴살 샌드위치', c: 'we', s: '1개 230g', q: 230, u: 'g', p: 28, src: 'd20' },
+  { k: 'D018328', n: '햄치즈 샌드위치', c: 'we', s: '1개 240g', q: 240, u: 'g', p: 21.1, src: 'd20' },
+  { k: 'D000299', n: '참치 샌드위치', c: 'we', s: '1개 250g', q: 250, u: 'g', p: 23.3, src: 'd19' },
+  { k: 'D018342', n: '닭가슴살 샐러드', c: 'we', s: '1회 150g', q: 150, u: 'g', p: 10.8, src: 'd20' },
+  { k: 'D018373', n: '참치 샐러드', c: 'we', s: '1회 150g', q: 150, u: 'g', p: 16.2, src: 'd20' },
+  { k: 'D018411', n: '스크램블에그', c: 'we', s: '1회 110g', q: 110, u: 'g', p: 13, src: 'd20' },
+  { k: 'D018307', n: '베이글', c: 'we', s: '1개 120g', q: 120, u: 'g', p: 12, src: 'd20' },
+  { k: 'D018190', n: '김밥', c: 'bs', s: '1줄 230g', q: 230, u: 'g', p: 11.1, src: 'd20' },
+  { k: 'D018227', n: '참치김밥', c: 'bs', s: '1줄 250g', q: 250, u: 'g', p: 17.5, src: 'd20' },
+  { k: 'D018232', n: '치즈김밥', c: 'bs', s: '1줄 270g', q: 270, u: 'g', p: 16.9, src: 'd20' },
+  { k: 'D000231', n: '소고기김밥', c: 'bs', s: '1줄 250g', q: 250, u: 'g', p: 16, src: 'd19' },
+  { k: 'D018196', n: '돈까스김밥', c: 'bs', s: '1줄 320g', q: 320, u: 'g', p: 18.4, src: 'd20' },
+  { k: 'D018228', n: '참치마요 삼각김밥', c: 'bs', s: '1회 200g', q: 200, u: 'g', p: 11.9, src: 'd20' },
+  { k: 'D018256', n: '떡볶이', c: 'bs', s: '1인분 180g', q: 180, u: 'g', p: 6.3, src: 'd20' },
+  { k: 'D018257', n: '라볶이', c: 'bs', s: '1인분 200g', q: 200, u: 'g', p: 5.7, src: 'd20' },
+  { k: 'D018159', n: '계란라면', c: 'bs', s: '1그릇 550g', q: 550, u: 'g', p: 14.4, src: 'd20' },
+  { k: 'D000169', n: '치즈라면', c: 'bs', s: '1그릇 600g', q: 600, u: 'g', p: 16.8, src: 'd19' },
+  { k: 'D018182', n: '쫄면', c: 'bs', s: '1인분 550g', q: 550, u: 'g', p: 17.7, src: 'd20' },
+  { k: 'D000417', n: '순대', c: 'bs', s: '1인분 300g', q: 300, u: 'g', p: 19.6, src: 'd19' },
+  { k: 'D018156', n: '고기만두', c: 'bs', s: '1인분 220g', q: 220, u: 'g', p: 27.2, src: 'd20' },
+  { k: 'D018158', n: '김치만두', c: 'bs', s: '1인분 220g', q: 220, u: 'g', p: 22.5, src: 'd20' },
+  { k: 'D018157', n: '군만두', c: 'bs', s: '1인분 220g', q: 220, u: 'g', p: 15.5, src: 'd20' },
+  { k: 'D018535', n: '닭강정', c: 'bs', s: '1회 200g', q: 200, u: 'g', p: 23.7, src: 'd20' },
+  { k: 'D000009', n: '닭꼬치', c: 'bs', s: '1개 70g', q: 70, u: 'g', p: 11.6, src: 'd19' },
+  { k: 'D018093', n: '어묵국', c: 'bs', s: '1그릇 350g', q: 350, u: 'g', p: 5.2, src: 'd20' },
   { k: 'selex_profit', n: '셀렉스 프로핏', c: 'drink', s: '1개 250ml', q: 250, u: 'ml', p: 20, src: 'lab' },
   { k: 'hymune_active', n: '하이뮨 프로틴 밸런스 액티브', c: 'drink', s: '1개 250ml', q: 250, u: 'ml', p: 20, src: 'lab' },
   { k: 'danbaek_coffee', n: '더단백 드링크 (커피·초콜릿 등)', c: 'drink', s: '1개 250ml', q: 250, u: 'ml', p: 20, src: 'lab' },
@@ -705,7 +877,7 @@ const DEFAULT_NUTRI = { factor: 1.6, target: null, custom: [] };
 /* ── 상태 ─────────────────────────────────────── */
 const state = { exercises: [], routines: [], settings: Object.assign({}, DEFAULT_SETTINGS), months: {}, live: null, profile: clone(DEFAULT_PROFILE), body: [], coach: null, nutri: clone(DEFAULT_NUTRI), pmonths: {} };
 const ui = { tab: 'workout', ready: false, slow: false, loadErr: null, writeErr: false, sync: 'loading', progEx: null, metric: null, addEx: false, addExName: '', addExType: 'weight', sheet: null, chart: null, xs: null, calMonth: null, calDay: null, bd: null,
-  pday: null, pcat: null, pq: '', pmore: false, pa: null, pc: null, pk: null, pt: null, se: null };
+  pday: null, pcat: null, pq: '', pmore: false, pa: null, pc: null, pk: null, pt: null, se: null, plOpen: new Set() };
 const store = { mode: 'loading', db: null, uid: null };
 let edit = null;
 
@@ -1118,17 +1290,53 @@ function viewToday() {
   h += proteinMini();
   h += '<div class="stack">' + state.routines.map(rt => {
     const last = sessions().find(s => s.routineId === rt.id);
-    const rows = rt.items.map(it => {
-      const ex = exById(it.exId); if (!ex) return '';
-      const tg = itemTarget(it);
-      return '<li><span class="pn">' + esc(ex.name) + '</span>' + recChip(recommend(ex, tg, hist(ex.id)), ex.type, ex.inc, tg) + '</li>';
-    }).join('');
+    const rows = rt.items.map((it, i) => planRow(rt, it, i)).join('');
     return '<article class="card rt"><header class="rt-h"><h2>' + esc(rt.name) + (rt.id === nextId ? '<span class="tag">다음 차례</span>' : '') + '</h2><span class="ago">' + (last ? '마지막 ' + md(last.start) + ' · ' + ago(last.start) : '아직 기록 없음') + '</span></header>' +
       '<ul class="plan">' + (rows || '<li class="muted">운동이 없어요. 루틴 관리에서 추가해 주세요.</li>') + '</ul>' +
       '<button class="btn primary block" data-act="start" data-id="' + esc(rt.id) + '">운동 시작</button></article>';
   }).join('') + '</div>';
   h += '<div class="row2"><button class="btn" type="button" data-act="goto" data-v="routines">루틴 관리</button><button class="btn dashed" type="button" data-act="start-free">빈 운동 시작</button></div>';
   return h + rulesHTML();
+}
+
+function planChip(ex, it) { const tg = itemTarget(it); return recChip(recommend(ex, tg, hist(ex.id)), ex.type, ex.inc, tg); }
+function planRow(rt, it, i) {
+  const ex = exById(it.exId); if (!ex) return '';
+  const key = rt.id + ':' + i, open = ui.plOpen.has(key), id = 'pd-' + rt.id + '-' + i, ca = isCardio(ex.type), bw = ex.type === 'bw';
+  const f = (fld, v, lbl, mode, ph) => '<input id="pl-' + rt.id + '-' + i + '-' + fld + '" class="num" inputmode="' + (mode || 'numeric') + '" data-pl="' + fld + '" data-r="' + esc(rt.id) + '" data-i="' + i + '" value="' + esc(v == null ? '' : v) + '"' + (ph ? ' placeholder="' + ph + '"' : '') + ' aria-label="' + esc(ex.name) + ' ' + lbl + '">';
+  return '<li class="pl"><button class="pl-h" type="button" data-act="pl-tg" data-r="' + esc(rt.id) + '" data-i="' + i + '" aria-expanded="' + open + '" aria-controls="' + id + '"><span class="pn">' + esc(ex.name) + '</span><span class="chev">' + ICON.chev + '</span></button>' +
+    '<div class="pdet" id="' + id + '"' + (open ? '' : ' hidden') + '><div class="pd-next"><span>다음 목표</span><span id="pc-' + rt.id + '-' + i + '">' + planChip(ex, it) + '</span></div><div class="pd-f">' +
+    (ca
+      ? '<label class="nf">구간 ' + f('sets', it.sets, '구간 수') + '</label><label class="nf">목표 시간 ' + f('repMin', it.repMin, '목표 시간 분') + ' 분</label>'
+      : '<label class="nf">세트 ' + f('sets', it.sets, '세트 수') + '</label>' +
+        '<label class="nf">횟수 ' + f('repMin', it.repMin, '최소 횟수') + ' – ' + f('repMax', it.repMax, '최대 횟수') + '</label>' +
+        '<label class="nf">' + (bw ? '가중 단위' : '증량 단위') + ' ' + f('inc', ex.inc, bw ? '가중 단위 kg' : '증량 단위 kg', 'decimal') + ' kg</label>' +
+        '<label class="nf">휴식 ' + f('rest', it.rest || '', '휴식 초', 'numeric', '기본') + ' 초</label>') +
+    '</div></div></li>';
+}
+function plToggle(t) {
+  const key = t.dataset.r + ':' + t.dataset.i, open = !ui.plOpen.has(key);
+  if (open) ui.plOpen.add(key); else ui.plOpen.delete(key);
+  t.setAttribute('aria-expanded', String(open));
+  const d = document.getElementById(t.getAttribute('aria-controls')); if (d) d.hidden = !open;
+}
+// 오늘 화면에서 고친 세트·횟수를 바로 루틴에 저장하고 다음 목표를 다시 계산
+function plChange(el) {
+  const rt = state.routines.find(r => r.id === el.dataset.r), i = +el.dataset.i, it = rt && rt.items[i];
+  const ex = it && exById(it.exId); if (!ex) return;
+  const fld = el.dataset.pl, ca = isCardio(ex.type);
+  if (fld === 'sets') it.sets = clampInt(el.value, 1, 20, it.sets);
+  else if (ca && fld === 'repMin') it.repMin = it.repMax = clampInt(el.value, 1, 600, it.repMin);
+  else if (fld === 'repMin' || fld === 'repMax') {
+    it[fld] = clampInt(el.value, 1, 200, it[fld]);
+    if (it.repMax < it.repMin) { const a = it.repMin; it.repMin = it.repMax; it.repMax = a; }
+  } else if (fld === 'rest') { const r = clampInt(el.value, 0, 600, 0); if (r) it.rest = r; else delete it.rest; }
+  else if (fld === 'inc') { const n = num(el.value); if (n != null) ex.inc = Math.min(100, Math.max(0, r2(n))); }
+  saveApp();
+  const $f = k => document.getElementById('pl-' + rt.id + '-' + i + '-' + k);
+  [['sets', it.sets], ['repMin', it.repMin], ['repMax', it.repMax], ['inc', ex.inc], ['rest', it.rest || '']].forEach(([k, v]) => { const x = $f(k); if (x && x !== document.activeElement) x.value = v; });
+  el.value = { sets: it.sets, repMin: it.repMin, repMax: it.repMax, inc: ex.inc, rest: it.rest || '' }[fld];
+  const c = document.getElementById('pc-' + rt.id + '-' + i); if (c) c.innerHTML = planChip(ex, it);
 }
 
 function viewSession() {
@@ -1852,7 +2060,7 @@ function settingsHTML() {
     '</div>';
 }
 
-const blankItem = () => ({ k: uid(), exId: null, name: '', type: 'weight', inc: 2.5, sets: 3, repMin: 8, repMax: 12, m: '', rest: '', rir: '' });
+const blankItem = () => ({ k: uid(), exId: null, name: '', type: 'weight', inc: 2.5, sets: 3, repMin: 8, repMax: 12, m: '', rest: '', rir: '', open: true });
 function openEditor(rid) {
   const rt = rid ? state.routines.find(r => r.id === rid) : null;
   edit = {
@@ -1860,7 +2068,7 @@ function openEditor(rid) {
     name: rt ? rt.name : '',
     items: rt ? rt.items.map(it => {
       const ex = exById(it.exId) || {};
-      return { k: uid(), exId: it.exId, name: ex.name || '', type: ex.type || 'weight', inc: ex.inc == null ? 2.5 : ex.inc, sets: it.sets, repMin: it.repMin, repMax: it.repMax, m: ex.m || guessMuscles(ex.name).m || '', rest: it.rest || '', rir: it.rir || '' };
+      return { k: uid(), exId: it.exId, name: ex.name || '', type: ex.type || 'weight', inc: ex.inc == null ? 2.5 : ex.inc, sets: it.sets, repMin: it.repMin, repMax: it.repMax, m: ex.m || guessMuscles(ex.name).m || '', rest: it.rest || '', rir: it.rir || '', open: false };
     }) : [blankItem()]
   };
   if (!edit.items.length) edit.items.push(blankItem());
@@ -1873,10 +2081,8 @@ function editorHTML() {
     return '<div class="ed-item" data-k="' + k + '">' +
       '<div class="ed-r1"><span class="ed-no">' + (i + 1) + '</span>' +
         '<input id="ed-' + k + '-name" class="txt" list="ex-names" data-ed="iname" data-k="' + k + '" value="' + esc(it.name) + '" placeholder="운동 이름" autocomplete="off" aria-label="' + (i + 1) + '번 운동 이름">' +
-        '<button class="icon-btn xs" type="button" id="ed-' + k + '-up" data-act="ed-up" data-k="' + k + '" aria-label="위로"' + (i === 0 ? ' disabled' : '') + '>' + ICON.up + '</button>' +
-        '<button class="icon-btn xs" type="button" id="ed-' + k + '-down" data-act="ed-down" data-k="' + k + '" aria-label="아래로"' + (i === n - 1 ? ' disabled' : '') + '>' + ICON.down + '</button>' +
-        '<button class="icon-btn xs" type="button" id="ed-' + k + '-rm" data-act="ed-rm" data-k="' + k + '" aria-label="이 운동 빼기">' + ICON.x + '</button></div>' +
-      '<div class="ed-r2">' +
+        '<button class="icon-btn xs ed-tg" type="button" id="ed-' + k + '-tg" data-act="ed-tg" data-k="' + k + '" aria-expanded="' + !!it.open + '" aria-controls="ed-' + k + '-d" aria-label="' + (i + 1) + '번 운동 세부 설정">' + ICON.chev + '</button></div>' +
+      '<div class="ed-d" id="ed-' + k + '-d"' + (it.open ? '' : ' hidden') + '><div class="ed-r2">' +
         '<div class="seg sm" role="group" aria-label="종류">' + TYPES.map(t => '<button type="button" id="ed-' + k + '-t' + t[0] + '" data-act="ed-type" data-k="' + k + '" data-v="' + t + '" aria-pressed="' + (typeOf(it.type) === t) + '">' + TYPE_L[t] + '</button>').join('') + '</div>' +
         (ca
           ? '<label class="nf">구간 <input id="ed-' + k + '-sets" class="num" inputmode="numeric" data-ed="sets" data-k="' + k + '" value="' + esc(it.sets) + '"></label>' +
@@ -1886,14 +2092,17 @@ function editorHTML() {
             '<label class="nf">' + (bw ? '가중 단위' : '증량 단위') + ' <input id="ed-' + k + '-inc" class="num" inputmode="decimal" data-ed="inc" data-k="' + k + '" value="' + esc(it.inc) + '"> kg</label>' +
             '<label class="nf">휴식 <input id="ed-' + k + '-rest" class="num" inputmode="numeric" data-ed="rest" data-k="' + k + '" value="' + esc(it.rest) + '" placeholder="기본"> 초</label>' +
             '<label class="nf">주 근육 <select id="ed-' + k + '-m" class="sel" data-ed="m" data-k="' + k + '"><option value="">모름</option>' + MUSCLES.map(([mk, ml]) => '<option value="' + mk + '"' + (it.m === mk ? ' selected' : '') + '>' + ml + '</option>').join('') + '</select></label>') +
-      '</div></div>';
+      '</div><div class="ed-r3">' +
+        '<button class="icon-btn xs" type="button" id="ed-' + k + '-up" data-act="ed-up" data-k="' + k + '" aria-label="위로"' + (i === 0 ? ' disabled' : '') + '>' + ICON.up + '</button>' +
+        '<button class="icon-btn xs" type="button" id="ed-' + k + '-down" data-act="ed-down" data-k="' + k + '" aria-label="아래로"' + (i === n - 1 ? ' disabled' : '') + '>' + ICON.down + '</button>' +
+        '<button class="btn sm ghost" type="button" id="ed-' + k + '-rm" data-act="ed-rm" data-k="' + k + '">이 운동 빼기</button></div></div></div>';
   }).join('');
   return '<div class="sheet-h"><button class="btn ghost" type="button" data-act="sheet-close">취소</button><h2 id="sheet-title">' + (edit.id ? '루틴 편집' : '새 루틴') + '</h2><button class="btn primary" type="button" data-act="ed-save">저장</button></div>' +
     '<div class="sheet-b"><label class="lbl" for="ed-name">루틴 이름</label>' +
     '<input id="ed-name" class="txt" data-ed="name" value="' + esc(edit.name) + '" placeholder="예: 상체 A, 맨몸 데일리" autocomplete="off" style="margin-top:6px">' +
     '<div class="ed-items">' + items + '</div>' +
     '<button class="btn block dashed" type="button" id="ed-add" data-act="ed-add">+ 운동 추가</button>' +
-    '<p class="ed-help">세트 수와 횟수 범위가 다음 목표의 기준이에요. 모든 세트가 범위 상한을 채우면 증량 단위만큼 올라가요. 맨몸 운동은 체중에 더한 가중만 적고, 유산소는 속도와 시간을 적어요. 이미 있는 운동 이름을 고르면 지난 기록이 이어져요.</p>' +
+    '<p class="ed-help">운동 옆 ▾를 누르면 종류·세트·횟수·휴식을 바꿀 수 있어요. 세트 수와 횟수 범위가 다음 목표의 기준이에요. 모든 세트가 범위 상한을 채우면 증량 단위만큼 올라가요. 맨몸 운동은 체중에 더한 가중만 적고, 유산소는 속도와 시간을 적어요. 이미 있는 운동 이름을 고르면 지난 기록이 이어져요.</p>' +
     '<p class="err" id="ed-err" role="alert" hidden></p>' +
     (edit.id ? '<button class="btn block danger-line gap-top" type="button" data-act="ed-del">이 루틴 삭제</button>' : '') +
     '<datalist id="ex-names">' + state.exercises.map(x => '<option value="' + esc(x.name) + '"></option>').join('') + '</datalist></div>';
@@ -1961,7 +2170,7 @@ function edSave() {
   const name = String(edit.name || '').trim() || '새 루틴';
   const rt = edit.id ? state.routines.find(r => r.id === edit.id) : null;
   if (rt) { rt.name = name; rt.items = items; } else state.routines.push({ id: edit.id || uid(), name, items });
-  gcExercises();
+  gcExercises(); ui.plOpen.clear();
   saveApp(); closeSheet(); render(); toast('루틴을 저장했어요');
 }
 async function edDelete() {
@@ -2462,7 +2671,7 @@ function viewProtein() {
       '<div class="row"><button class="btn primary" type="button" data-act="body-open">몸무게 기록</button><button class="btn" type="button" data-act="p-target-open">직접 정하기</button></div></section>';
   }
   h += '<div class="sec-h"><h2>먹은 음식 더하기</h2>' + (isToday ? '' : '<span class="ago">' + m + '/' + d + '에 기록돼요</span>') + '</div>';
-  h += '<section class="card padd"><input id="p-search" class="txt" type="search" value="' + esc(ui.pq) + '" placeholder="음식·제품 검색 (예: 닭가슴살, 셀렉스)" autocomplete="off" enterkeyhint="search" aria-label="음식 검색">' +
+  h += '<section class="card padd"><input id="p-search" class="txt" type="search" value="' + esc(ui.pq) + '" placeholder="음식·메뉴·제품 검색 (예: 김치찌개, 닭가슴살)" autocomplete="off" enterkeyhint="search" aria-label="음식 검색">' +
     '<div class="chips" role="group" aria-label="음식 분류" id="p-chips">' + PCATS.map(([k, l]) => '<button type="button" class="chip" id="pcat-' + k + '" data-act="p-cat" data-v="' + k + '" aria-pressed="' + (!ui.pq.trim() && ui.pcat === k) + '">' + l + '</button>').join('') + '</div>' +
     '<ul class="flist" id="p-flist" aria-label="음식 목록">' + foodListHTML() + '</ul>' +
     '<div class="row"><button class="btn sm" type="button" data-act="p-quick-open">단백질 양만 입력</button><button class="btn sm" type="button" data-act="p-custom-open">+ 내 음식 추가</button></div></section>';
@@ -2472,7 +2681,7 @@ function viewProtein() {
         '<button class="icon-btn xs ghost" type="button" data-act="p-del" data-id="' + esc(e.id) + '" aria-label="' + esc(e.n) + ' 기록 지우기">' + ICON.trash + '</button></li>').join('') + '</ul></section>'
     : '<div class="card empty"><p>' + (isToday ? '아직 기록이 없어요. 위 목록에서 음식을 고르면 단백질이 자동으로 더해져요.' : '이날은 기록이 없어요. 지금 더하면 이 날짜에 들어가요.') + '</p></div>';
   h += weekHTML(dk, T);
-  h += '<p class="fsrc">음식 데이터: 식약처 식품성분 DB(100g당 값을 1회 분량으로 환산), 대한당뇨병학회 식품교환표(어육류 1교환 단백질 8g · 곡류 2g · 우유 200ml 6g), ProteinLab 단백질 음료 DB(2026년 11월 확인), 파우더는 제품 영양 정보. 제품은 맛과 리뉴얼에 따라 수치가 달라질 수 있어요. 포장지 값과 다르면 ‘내 음식’으로 추가해 주세요. 목표 근거는 코치 탭 근거 논문 9·11번이에요.</p>';
+  h += '<p class="fsrc">음식 데이터: 한식·중식·일식·양식·분식 메뉴는 식약처 식품영양성분 자료집(2020)과 외식영양성분자료집 통합본(2019)의 1인분 값(NOFAT 정리), 식재료는 식약처 식품성분 DB(100g당 값을 1회 분량으로 환산)와 대한당뇨병학회 식품교환표(어육류 1교환 단백질 8g · 곡류 2g · 우유 200ml 6g), ProteinLab 단백질 음료 DB(2026년 11월 확인), 파우더는 제품 영양 정보. 메뉴는 식당·레시피마다, 제품은 맛과 리뉴얼에 따라 수치가 달라질 수 있어요. 먹은 양이 다르면 분량이나 g으로 맞춰 주세요. 포장지 값과 다르면 ‘내 음식’으로 추가해 주세요. 목표 근거는 코치 탭 근거 논문 9·11번이에요.</p>';
   return h;
 }
 function foodListHTML() {
@@ -2664,6 +2873,8 @@ document.addEventListener('click', ev => {
     case 'preset-add': addPresets(); break;
     case 'edit': openEditor(id); break;
     case 'ed-type': { const it = edItem(k); if (it) { edSetType(it, v); refreshSheet(); } break; }
+    case 'ed-tg': { const it = edItem(k); if (it) { it.open = !it.open; t.setAttribute('aria-expanded', String(it.open)); const d = document.getElementById('ed-' + k + '-d'); if (d) d.hidden = !it.open; } break; }
+    case 'pl-tg': plToggle(t); break;
     case 'ed-up': edMove(k, -1); break;
     case 'ed-down': edMove(k, 1); break;
     case 'ed-rm': edit.items = edit.items.filter(x => x.k !== k); if (!edit.items.length) edit.items.push(blankItem()); refreshSheet(); break;
@@ -2739,6 +2950,7 @@ document.addEventListener('change', ev => {
   const el = ev.target;
   if (el.dataset && el.dataset.f === 'w' && el.closest('#main')) onWeightChange(el);
   else if (el.dataset && el.dataset.ed === 'iname') edNameChange(el);
+  else if (el.dataset && el.dataset.pl && el.closest('#main')) plChange(el);
   else if (el.dataset && el.dataset.ed === 'm' && edit) { const it = edItem(el.dataset.k); if (it) it.m = el.value; }
   else if (el.dataset && el.dataset.bf && ui.bd) ui.bd[el.dataset.bf] = el.value;
   else if (el.id === 'import-file' && el.files && el.files[0]) { importFile(el.files[0]); el.value = ''; }
@@ -2755,6 +2967,7 @@ document.addEventListener('keydown', ev => {
   else if (t.id === 'pt-g') { ev.preventDefault(); saveTarget(); }
   else if (t.dataset && t.dataset.f === 'w' && t.closest('#main')) { ev.preventDefault(); focusLater('r-' + t.dataset.e + '-' + t.dataset.s); }
   else if (t.dataset && t.dataset.f === 'r' && t.closest('#main')) { ev.preventDefault(); t.blur(); }
+  else if (t.dataset && t.dataset.pl) { ev.preventDefault(); t.blur(); }
 });
 document.getElementById('sheet').addEventListener('click', ev => { if (ev.target.id === 'sheet' && ['settings', 'summary', 'export'].includes(ui.sheet)) closeSheet(); });
 window.addEventListener('scroll', () => document.getElementById('top').classList.toggle('scrolled', window.scrollY > 4), { passive: true });
@@ -2773,7 +2986,7 @@ boot();
 
 <script>
 // 오프라인 사용을 위한 서비스 워커와, 기기 저장 공간이 지워지지 않도록 요청
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=7e6e4b6577').catch(() => {}));
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=d86d1aa752').catch(() => {}));
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 </script>
 </body>
