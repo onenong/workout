@@ -166,6 +166,13 @@ body.has-rest main.wrap{padding-bottom:calc(var(--tabbar-h) + 112px)}
 .pl-h[aria-expanded="true"] .chev{background:var(--ink);color:var(--on-ink)}
 .pl-h[aria-expanded="true"] .chev .ic,.ed-tg[aria-expanded="true"] .ic{transform:rotate(180deg)}
 .pdet{display:grid;gap:12px;padding:2px 0 14px}
+.rt-t{font:700 18px/1.35 var(--f-body);min-width:0}
+.rt-tg{appearance:none;display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:44px;padding:0;border:0;background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.rt-tx{display:grid;gap:3px;min-width:0}
+.rt-n{overflow-wrap:anywhere}
+.rt-tg .ago{font-weight:400}
+.rt-tg[aria-expanded="true"] .chev{background:var(--ink);color:var(--on-ink)}
+.rt-tg[aria-expanded="true"] .chev .ic{transform:rotate(180deg)}
 .pd-next{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--ink-2)}
 .pd-f{display:flex;flex-wrap:wrap;gap:10px 14px}
 .rules{margin-top:18px;padding:4px 14px;border-radius:14px;background:var(--sunk)}
@@ -877,7 +884,7 @@ const DEFAULT_NUTRI = { factor: 1.6, target: null, custom: [] };
 /* ── 상태 ─────────────────────────────────────── */
 const state = { exercises: [], routines: [], settings: Object.assign({}, DEFAULT_SETTINGS), months: {}, live: null, profile: clone(DEFAULT_PROFILE), body: [], coach: null, nutri: clone(DEFAULT_NUTRI), pmonths: {} };
 const ui = { tab: 'workout', ready: false, slow: false, loadErr: null, writeErr: false, sync: 'loading', progEx: null, metric: null, addEx: false, addExName: '', addExType: 'weight', sheet: null, chart: null, xs: null, calMonth: null, calDay: null, bd: null,
-  pday: null, pcat: null, pq: '', pmore: false, pa: null, pc: null, pk: null, pt: null, se: null, plOpen: new Set() };
+  pday: null, pcat: null, pq: '', pmore: false, pa: null, pc: null, pk: null, pt: null, se: null, plOpen: new Set(), rtOpen: new Set() };
 const store = { mode: 'loading', db: null, uid: null };
 let edit = null;
 
@@ -1291,8 +1298,11 @@ function viewToday() {
   h += '<div class="stack">' + state.routines.map(rt => {
     const last = sessions().find(s => s.routineId === rt.id);
     const rows = rt.items.map((it, i) => planRow(rt, it, i)).join('');
-    return '<article class="card rt"><header class="rt-h"><h2>' + esc(rt.name) + (rt.id === nextId ? '<span class="tag">다음 차례</span>' : '') + '</h2><span class="ago">' + (last ? '마지막 ' + md(last.start) + ' · ' + ago(last.start) : '아직 기록 없음') + '</span></header>' +
-      '<ul class="plan">' + (rows || '<li class="muted">운동이 없어요. 루틴 관리에서 추가해 주세요.</li>') + '</ul>' +
+    const open = ui.rtOpen.has(rt.id), bid = 'rb-' + rt.id;
+    return '<article class="card rt"><h2 class="rt-t"><button class="rt-tg" type="button" data-act="rt-tg" data-id="' + esc(rt.id) + '" aria-expanded="' + open + '" aria-controls="' + bid + '">' +
+        '<span class="rt-tx"><span class="rt-n">' + esc(rt.name) + (rt.id === nextId ? '<span class="tag">다음 차례</span>' : '') + '</span><span class="ago">' + (last ? '마지막 ' + md(last.start) + ' · ' + ago(last.start) : '아직 기록 없음') + '</span></span>' +
+        '<span class="chev">' + ICON.chev + '</span></button></h2>' +
+      '<div class="rt-b" id="' + bid + '"' + (open ? '' : ' hidden') + '><ul class="plan">' + (rows || '<li class="muted">운동이 없어요. 루틴 관리에서 추가해 주세요.</li>') + '</ul></div>' +
       '<button class="btn primary block" data-act="start" data-id="' + esc(rt.id) + '">운동 시작</button></article>';
   }).join('') + '</div>';
   h += '<div class="row2"><button class="btn" type="button" data-act="goto" data-v="routines">루틴 관리</button><button class="btn dashed" type="button" data-act="start-free">빈 운동 시작</button></div>';
@@ -2875,6 +2885,7 @@ document.addEventListener('click', ev => {
     case 'ed-type': { const it = edItem(k); if (it) { edSetType(it, v); refreshSheet(); } break; }
     case 'ed-tg': { const it = edItem(k); if (it) { it.open = !it.open; t.setAttribute('aria-expanded', String(it.open)); const d = document.getElementById('ed-' + k + '-d'); if (d) d.hidden = !it.open; } break; }
     case 'pl-tg': plToggle(t); break;
+    case 'rt-tg': { const open = !ui.rtOpen.has(id); if (open) ui.rtOpen.add(id); else ui.rtOpen.delete(id); t.setAttribute('aria-expanded', String(open)); const d = document.getElementById(t.getAttribute('aria-controls')); if (d) d.hidden = !open; break; }
     case 'ed-up': edMove(k, -1); break;
     case 'ed-down': edMove(k, 1); break;
     case 'ed-rm': edit.items = edit.items.filter(x => x.k !== k); if (!edit.items.length) edit.items.push(blankItem()); refreshSheet(); break;
@@ -2986,7 +2997,7 @@ boot();
 
 <script>
 // 오프라인 사용을 위한 서비스 워커와, 기기 저장 공간이 지워지지 않도록 요청
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=d86d1aa752').catch(() => {}));
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=4dc4eb7408').catch(() => {}));
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 </script>
 </body>
