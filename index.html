@@ -279,6 +279,22 @@ body.has-rest main.wrap{padding-bottom:calc(var(--tabbar-h) + 112px)}
 /* 성장 탭 */
 .chips{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 8px;margin:0 -2px 6px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
+.chips.wrap{flex-wrap:wrap;overflow:visible;padding-bottom:2px;margin-bottom:12px}
+.chip .cn{margin-left:5px;font-weight:500;opacity:.6}
+.part-card{padding:14px 14px 8px}
+.part-h{display:flex;align-items:baseline;justify-content:space-between;gap:6px 12px;flex-wrap:wrap;padding:0 2px 6px}
+.part-h h2{font:700 16px/1.35 var(--f-body)}
+.part-h span{font-size:13px;color:var(--ink-2)}
+.part-list{list-style:none;padding:0;display:grid}
+.part-row{appearance:none;width:100%;display:grid;grid-template-columns:minmax(0,1fr) 58px minmax(72px,auto);align-items:center;gap:10px;padding:10px 8px;border:0;border-top:1px solid var(--line);border-radius:0;background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.part-list li:first-child .part-row{border-top:0}
+.part-row[aria-pressed="true"]{background:var(--sunk);border-radius:10px;border-top-color:transparent}
+.pr-n{min-width:0;font-weight:600;overflow-wrap:anywhere}
+.pr-n small{display:block;margin-top:2px;font-weight:400;font-size:12px;color:var(--ink-3)}
+.spark{width:58px;height:24px;color:var(--ink-3)}
+.part-row[aria-pressed="true"] .spark{color:var(--ink)}
+.pr-v{display:grid;justify-items:end;gap:2px;font:700 15px/1.15 var(--f-num);white-space:nowrap}
+.pr-v small{font:600 12.5px/1.2 var(--f-num)}
 .chip{appearance:none;flex:none;height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink-2);font:600 13.5px/1 var(--f-body);cursor:pointer;white-space:nowrap}
 .chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
 .chart-card{padding:14px 10px 10px}
@@ -912,7 +928,7 @@ const DEFAULT_NUTRI = { factor: 1.6, target: null, custom: [] };
 
 /* ── 상태 ─────────────────────────────────────── */
 const state = { exercises: [], routines: [], settings: Object.assign({}, DEFAULT_SETTINGS), months: {}, live: null, profile: clone(DEFAULT_PROFILE), body: [], coach: null, nutri: clone(DEFAULT_NUTRI), pmonths: {} };
-const ui = { tab: 'workout', ready: false, slow: false, loadErr: null, writeErr: false, sync: 'loading', progEx: null, metric: null, addEx: false, addExName: '', addExType: 'weight', sheet: null, chart: null, xs: null, calMonth: null, calDay: null, bd: null,
+const ui = { tab: 'workout', ready: false, slow: false, loadErr: null, writeErr: false, sync: 'loading', progEx: null, progPart: null, metric: null, addEx: false, addExName: '', addExType: 'weight', sheet: null, chart: null, xs: null, calMonth: null, calDay: null, bd: null,
   pday: null, pcat: null, pq: '', pmore: false, pa: null, pc: null, pk: null, pt: null, se: null, plOpen: new Set(), rtOpen: new Set() };
 const store = { mode: 'loading', db: null, uid: null };
 let edit = null;
@@ -1538,16 +1554,56 @@ function logItem(s) {
     '<ul class="lines">' + lines + '</ul>' + (prs ? '<div class="prs">' + prs + '</div>' : '') + '</div></article>';
 }
 
+// 성장 탭 부위: 세부 근육을 크게 묶음
+const PARTS = [['chest', '가슴', ['chest']], ['back', '등', ['back']], ['shoulders', '어깨', ['shoulders']], ['arms', '팔', ['biceps', 'triceps']], ['legs', '하체', ['quads', 'posterior', 'calves']], ['core', '코어', ['core']], ['cardio', '유산소', []], ['etc', '기타', []]];
+function partOf(t) {
+  if (isCardio(t.type)) return 'cardio';
+  const ex = exById(t.id), m = (ex && ex.m) || guessMuscles(t.name).m;
+  const p = PARTS.find(x => x[2].includes(m)); return p ? p[0] : 'etc';
+}
+// 운동마다 대표 지표 하나로 첫 기록 대비 변화를 계산
+function primaryOf(t, hasBW) {
+  const H = hist(t.id), type = t.type;
+  const [mk, ml, unit] = isCardio(type) ? ['km', '거리', 'km'] : type === 'bw' && !hasBW ? ['reps', '최고 횟수', '회'] : ['e1rm', '추정 1RM', 'kg'];
+  const pts = seriesFor(H, mk, type), first = pts[0], last = pts[pts.length - 1];
+  const d = pts.length > 1 ? r1(last.v - first.v) : null, pct = pts.length > 1 && first.v > 0 ? (last.v - first.v) / first.v * 100 : null;
+  return { t, pts, mk, ml, unit, last: last ? last.v : null, d, pct, n: H.length, at: H[0] ? H[0].start : 0 };
+}
+function sparkSVG(pts) {
+  if (pts.length < 2) return '<svg class="spark" viewBox="0 0 58 24" aria-hidden="true"><circle cx="29" cy="12" r="2.4" fill="currentColor"/></svg>';
+  const v = pts.map(p => p.v), lo = Math.min(...v), hi = Math.max(...v), span = hi - lo || 1, P = pts.slice(-12);
+  const xy = P.map((p, i) => [3 + i * 52 / (P.length - 1), 21 - (p.v - lo) / span * 18]);
+  return '<svg class="spark" viewBox="0 0 58 24" aria-hidden="true"><polyline points="' + xy.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' ') + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="' + xy[xy.length - 1][0].toFixed(1) + '" cy="' + xy[xy.length - 1][1].toFixed(1) + '" r="2.4" fill="currentColor"/></svg>';
+}
+function partCard(label, rows) {
+  const ch = rows.filter(r => r.pct != null), avg = ch.length ? ch.reduce((a, r) => a + r.pct, 0) / ch.length : null;
+  return '<section class="card part-card"><div class="part-h"><h2>' + label + '</h2><span>운동 ' + rows.length + '종' + (avg == null ? '' : ' · 첫 기록 대비 평균 <b class="' + dcls(r1(avg)) + '">' + signed(r1(avg), '%') + '</b>') + '</span></div><ul class="part-list">' +
+    rows.map(r => '<li><button type="button" class="part-row" data-act="pick-ex" data-id="' + esc(r.t.id) + '" aria-pressed="' + (r.t.id === ui.progEx) + '">' +
+      '<span class="pr-n">' + esc(r.t.name) + '<small>' + r.ml + ' · ' + r.n + '회 기록</small></span>' + sparkSVG(r.pts) +
+      '<span class="pr-v">' + (r.last == null ? '—' : fmtN(r.last) + r.unit) + '<small class="' + (r.d == null ? 'muted' : dcls(r.d)) + '">' + (r.d == null ? '첫 기록' : signed(r.d, r.unit)) + '</small></span></button></li>').join('') +
+    '</ul></section>';
+}
 function viewProgress() {
   const tr = trackedExercises(), B = bodySorted();
   const list = (B.length ? [{ id: '__body', name: '체성분' }] : []).concat(tr);
   let h = head('운동 ' + tr.length + '종' + (B.length ? ' · 체성분 ' + B.length + '회' : '') + ' 기록', '성장');
   if (!list.length) { ui.chart = null; return h + '<div class="card empty"><h2>아직 그래프가 없어요</h2><p>운동을 한 번 완료하면 운동별 추정 1RM·최고 무게·횟수 그래프와 최고 기록이 여기에 생겨요. 체성분을 기록하면 몸무게·체지방률·골격근량 추이도 볼 수 있어요.</p><div class="row"><button class="btn primary" data-act="goto" data-v="workout">운동하러 가기</button><button class="btn" data-act="body-open">체성분 기록</button></div></div>'; }
-  if (!list.some(t => t.id === ui.progEx)) ui.progEx = tr.length ? tr[0].id : '__body';
-  const chips = '<div class="chips" role="group" aria-label="항목 선택">' + list.map(t => '<button type="button" class="chip" data-act="pick-ex" data-id="' + esc(t.id) + '" aria-pressed="' + (t.id === ui.progEx) + '">' + esc(t.name) + '</button>').join('') + '</div>';
-  if (ui.progEx === '__body') return h + chips + bodyProgress(B);
-  const cur = tr.find(t => t.id === ui.progEx), type = cur.type;
-  const hasBW = bodySorted().some(b => b.w != null);
+  const hasBW = B.some(b => b.w != null);
+  // 부위별로 묶고, 부위 안에서는 최근에 한 운동부터
+  const byPart = new Map();
+  tr.map(t => primaryOf(t, hasBW)).sort((a, b) => b.at - a.at).forEach(r => { const p = partOf(r.t); if (!byPart.has(p)) byPart.set(p, []); byPart.get(p).push(r); });
+  const parts = PARTS.filter(p => byPart.has(p[0]));
+  if (ui.progEx && ui.progEx !== '__body' && tr.some(t => t.id === ui.progEx)) ui.progPart = partOf(tr.find(t => t.id === ui.progEx));
+  if (ui.progPart !== '__body' && !byPart.has(ui.progPart)) { const recent = [...byPart.values()].flat().sort((a, b) => b.at - a.at)[0]; ui.progPart = recent ? partOf(recent.t) : '__body'; }
+  if (ui.progPart === '__body' && !B.length) ui.progPart = parts[0][0];
+  const chips = '<div class="chips wrap" role="group" aria-label="부위 선택">' +
+    (B.length ? '<button type="button" class="chip" data-act="pick-part" data-v="__body" aria-pressed="' + (ui.progPart === '__body') + '">체성분</button>' : '') +
+    parts.map(p => '<button type="button" class="chip" data-act="pick-part" data-v="' + p[0] + '" aria-pressed="' + (p[0] === ui.progPart) + '">' + p[1] + '<span class="cn">' + byPart.get(p[0]).length + '</span></button>').join('') + '</div>';
+  if (ui.progPart === '__body') { ui.progEx = '__body'; return h + chips + bodyProgress(B); }
+  const rows = byPart.get(ui.progPart);
+  if (!rows.some(r => r.t.id === ui.progEx)) ui.progEx = rows[0].t.id;
+  const cur = rows.find(r => r.t.id === ui.progEx).t, type = cur.type;
+  h += chips + partCard(PARTS.find(p => p[0] === ui.progPart)[1], rows);
   const metrics = isCardio(type) ? [['km', '거리', 'km'], ['min', '시간', '분'], ['speed', '평균 속도', 'km/h']]
     : type === 'bw' ? (hasBW ? [['e1rm', '추정 1RM', 'kg'], ['reps', '최고 횟수', '회'], ['added', '가중', 'kg']] : [['reps', '최고 횟수', '회'], ['total', '총 횟수', '회'], ['added', '가중', 'kg']])
     : [['e1rm', '추정 1RM', 'kg'], ['top', '최고 무게', 'kg'], ['vol', '볼륨', 'kg']];
@@ -1555,7 +1611,6 @@ function viewProgress() {
   const met = metrics.find(m => m[0] === ui.metric);
   const H = hist(cur.id);
   ui.chart = { pts: seriesFor(H, met[0], type), unit: met[2], type, title: cur.name + ' ' + met[1] };
-  h += chips;
   h += '<section class="card chart-card"><div class="chart-h"><h2>' + esc(cur.name) + ' <span class="muted">· ' + met[1] + '</span></h2>' +
     '<div class="seg sm" role="group" aria-label="지표">' + metrics.map(m => '<button type="button" data-act="metric" data-v="' + m[0] + '" aria-pressed="' + (m[0] === met[0]) + '">' + m[1] + '</button>').join('') + '</div></div>' +
     '<div class="chart" id="chart" aria-label="기록 그래프. 좌우 화살표로 날짜별 값을 볼 수 있어요."></div>' +
@@ -3090,6 +3145,7 @@ document.addEventListener('click', ev => {
     case 'se-add-ex': seAddEx(); break;
     case 'se-save': saveSessEdit(); break;
     case 'pick-ex': ui.progEx = id; ui.metric = null; render(); break;
+    case 'pick-part': ui.progPart = v; ui.progEx = null; ui.metric = null; render(); break;
     case 'metric': ui.metric = v; render(); break;
     case 'xs-open': openXs(id); break;
     case 'xs-type': if (ui.xs) { ui.xs.type = typeOf(v); refreshSheet(); } break;
@@ -3185,7 +3241,7 @@ boot();
 
 <script>
 // 오프라인 사용을 위한 서비스 워커와, 기기 저장 공간이 지워지지 않도록 요청
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=19aed4a146').catch(() => {}));
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=2885528906').catch(() => {}));
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 </script>
 </body>
