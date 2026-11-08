@@ -345,13 +345,41 @@ body.has-rest main.wrap{padding-bottom:calc(var(--tabbar-h) + 112px)}
 .sheet-h h2{font:700 16px/1.2 var(--f-body);text-align:center}
 .sheet-b{padding:16px max(16px,env(safe-area-inset-right,0px)) 28px max(16px,env(safe-area-inset-left,0px))}
 .ed-items{display:grid;gap:10px;margin:16px 0 12px}
-.ed-item{display:grid;gap:10px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
-.ed-r1{display:flex;align-items:center;gap:4px}
-.ed-r1 .txt{flex:1 1 auto;min-width:0;margin-right:2px}
-.ed-no{flex:none;width:24px;text-align:center;font:700 20px/1 var(--f-num);color:var(--ink-3)}
-.ed-r2{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;padding-left:28px}
+.ed-items{position:relative}
+.ed-item{position:relative;display:grid;gap:12px;padding:6px 8px 6px 4px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.ed-item.open{padding-bottom:12px}
+.ed-r1{display:flex;align-items:center;gap:4px;min-height:46px;cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+.grip{flex:none;display:grid;place-items:center;width:24px;height:36px;color:var(--ink-3);cursor:grab}
+.grip .ic{width:18px;height:18px}
+.ed-no{flex:none;width:22px;text-align:center;font:700 18px/1 var(--f-num);color:var(--ink-3)}
+.ed-nm{flex:1 1 auto;min-width:0;padding:0 6px;font-weight:600;font-size:15.5px;overflow-wrap:anywhere}
+.ed-nm.ph{color:var(--ink-3);font-weight:500}
+.ed-r0{padding:0 4px 0 8px}
+.ed-r0 .txt{width:100%;margin-top:6px}
+.ed-r2{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;padding:0 4px 0 8px}
 .ed-d{display:grid;gap:12px}
-.ed-r3{display:flex;align-items:center;gap:6px;padding-left:28px}
+.ed-r3{display:flex;align-items:center;gap:6px;padding:0 4px 0 8px}
+.ed-item.dragging{z-index:5;border-color:var(--ink-3);box-shadow:0 14px 30px rgba(0,0,0,.18),0 2px 6px rgba(0,0,0,.12)}
+.ed-item.dragging .grip{color:var(--ink)}
+body.drag-on,body.drag-on *{cursor:grabbing!important;-webkit-user-select:none!important;user-select:none!important}
+.ed-adds{margin-top:0}
+.pk-q{width:100%}
+.pk-g{margin-top:18px;display:grid;gap:8px}
+.pk-list{display:grid;gap:6px}
+.pk-it{appearance:none;display:flex;align-items:center;gap:12px;width:100%;min-height:50px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pk-box{flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:7px;border:1.5px solid var(--ink-3);color:transparent}
+.pk-box .ic{width:16px;height:16px}
+.pk-it[aria-checked="true"]{border-color:var(--ink)}
+.pk-it[aria-checked="true"] .pk-box{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
+.pk-nm{flex:1 1 auto;min-width:0;font-weight:600;overflow-wrap:anywhere}
+.pk-meta{flex:none;font-size:12.5px;color:var(--ink-3)}
+.pk-it:disabled{cursor:default;opacity:.55}
+.pk-none{margin-top:18px}
+.lib{padding:14px 16px 16px;display:grid;gap:14px}
+.lib-g{display:grid;gap:8px}
+.lib-ch{display:flex;flex-wrap:wrap;gap:6px}
+.lib-ch .chip{height:34px;white-space:normal;text-align:left}
+.lib-help{margin:10px 2px 0;font-size:12.5px}
 .ed-r3 .btn{margin-left:auto}
 .ed-tg[aria-expanded="true"]{background:var(--ink);border-color:var(--ink);color:var(--on-ink)}
 .nf{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);white-space:nowrap}
@@ -600,6 +628,7 @@ const ICON = {
   up: ic('<path d="M12 18V6.5M7 11.5l5-5 5 5"/>'),
   down: ic('<path d="M12 6v11.5M7 12.5l5 5 5-5"/>'),
   chev: ic('<path d="M6.5 9.5l5.5 5.5 5.5-5.5"/>'),
+  grip: ic(dot(9, 6.5) + dot(15, 6.5) + dot(9, 12) + dot(15, 12) + dot(9, 17.5) + dot(15, 17.5)),
   coach: ic('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>'),
   protein: ic('<path d="M8.5 3h7v3l1.5 2.5V20a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V8.5L8.5 6z"/><path d="M8.5 6h7M7 12h10"/>'),
   plus: ic('<path d="M12 5.5v13M5.5 12h13"/>')
@@ -1450,7 +1479,16 @@ function viewRoutines() {
         '<div class="rt-actions"><button class="btn" type="button" data-act="edit" data-id="' + esc(rt.id) + '">편집</button><button class="btn primary" type="button" data-act="start" data-id="' + esc(rt.id) + '">시작</button></div></article>';
     }).join('') + '</div>';
   }
-  return h + '<button class="btn block dashed gap-top" type="button" data-act="new-routine">+ 새 루틴 만들기</button>';
+  h += '<button class="btn block dashed gap-top" type="button" data-act="new-routine">+ 새 루틴 만들기</button>';
+  return h + libHTML();
+}
+function libHTML() {
+  const groups = libGroups(state.exercises.slice());
+  let h = '<div class="sec-h"><h2>내 운동 <span class="muted">' + state.exercises.length + '종</span></h2><button class="btn sm" type="button" data-act="xs-new">+ 운동 등록</button></div>';
+  if (!groups.length) return h + '<div class="card empty"><p>루틴에 넣거나 기록한 운동이 여기 모여요. 루틴을 만들 때 ‘내 운동에서 고르기’로 여러 개를 한 번에 넣을 수 있어요.</p></div>';
+  return h + '<section class="card lib">' + groups.map(([g, list]) => '<div class="lib-g"><h3 class="sub-h">' + g + ' <span class="muted">' + list.length + '</span></h3><div class="lib-ch">' +
+      list.map(ex => '<button type="button" class="chip" data-act="xs-open" data-id="' + esc(ex.id) + '">' + esc(ex.name) + '</button>').join('') + '</div></div>').join('') +
+    '</section><p class="muted lib-help">운동을 누르면 이름·종류·증량 단위·주 근육을 바꿀 수 있어요. 루틴을 만들 때 ‘내 운동에서 고르기’로 여러 개를 한 번에 넣어요.</p>';
 }
 
 const dayKey = ts => { const d = new Date(ts); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); };
@@ -2085,14 +2123,17 @@ function openEditor(rid) {
   openSheet('editor', editorHTML());
 }
 function editorHTML() {
+  if (edit.pick) return pickHTML();
   const n = edit.items.length;
   const items = edit.items.map((it, i) => {
-    const k = it.k, bw = it.type === 'bw', ca = isCardio(it.type);
-    return '<div class="ed-item" data-k="' + k + '">' +
-      '<div class="ed-r1"><span class="ed-no">' + (i + 1) + '</span>' +
-        '<input id="ed-' + k + '-name" class="txt" list="ex-names" data-ed="iname" data-k="' + k + '" value="' + esc(it.name) + '" placeholder="운동 이름" autocomplete="off" aria-label="' + (i + 1) + '번 운동 이름">' +
-        '<button class="icon-btn xs ed-tg" type="button" id="ed-' + k + '-tg" data-act="ed-tg" data-k="' + k + '" aria-expanded="' + !!it.open + '" aria-controls="ed-' + k + '-d" aria-label="' + (i + 1) + '번 운동 세부 설정">' + ICON.chev + '</button></div>' +
-      '<div class="ed-d" id="ed-' + k + '-d"' + (it.open ? '' : ' hidden') + '><div class="ed-r2">' +
+    const k = it.k, bw = it.type === 'bw', ca = isCardio(it.type), nm = String(it.name || '').trim();
+    return '<div class="ed-item' + (it.open ? ' open' : '') + '" data-k="' + k + '">' +
+      '<div class="ed-r1" data-act="ed-tg" data-k="' + k + '" data-drag="' + k + '"><span class="grip" title="꾹 눌러 끌면 순서가 바뀌어요">' + ICON.grip + '</span><span class="ed-no">' + (i + 1) + '</span>' +
+        '<span class="ed-nm' + (nm ? '' : ' ph') + '" id="ed-' + k + '-nm">' + esc(nm || '새 운동') + '</span>' +
+        '<button class="icon-btn xs ed-tg" type="button" id="ed-' + k + '-tg" data-act="ed-tg" data-k="' + k + '" aria-expanded="' + !!it.open + '" aria-controls="ed-' + k + '-d" aria-label="' + esc(nm || (i + 1) + '번 운동') + ' 세부 설정">' + ICON.chev + '</button></div>' +
+      '<div class="ed-d" id="ed-' + k + '-d"' + (it.open ? '' : ' hidden') + '>' +
+      '<div class="ed-r0"><label class="lbl" for="ed-' + k + '-name">운동 이름</label><input id="ed-' + k + '-name" class="txt" list="ex-names" data-ed="iname" data-k="' + k + '" value="' + esc(it.name) + '" placeholder="예: 벤치프레스" autocomplete="off"></div>' +
+      '<div class="ed-r2">' +
         '<div class="seg sm" role="group" aria-label="종류">' + TYPES.map(t => '<button type="button" id="ed-' + k + '-t' + t[0] + '" data-act="ed-type" data-k="' + k + '" data-v="' + t + '" aria-pressed="' + (typeOf(it.type) === t) + '">' + TYPE_L[t] + '</button>').join('') + '</div>' +
         (ca
           ? '<label class="nf">구간 <input id="ed-' + k + '-sets" class="num" inputmode="numeric" data-ed="sets" data-k="' + k + '" value="' + esc(it.sets) + '"></label>' +
@@ -2111,13 +2152,114 @@ function editorHTML() {
     '<div class="sheet-b"><label class="lbl" for="ed-name">루틴 이름</label>' +
     '<input id="ed-name" class="txt" data-ed="name" value="' + esc(edit.name) + '" placeholder="예: 상체 A, 맨몸 데일리" autocomplete="off" style="margin-top:6px">' +
     '<div class="ed-items">' + items + '</div>' +
-    '<button class="btn block dashed" type="button" id="ed-add" data-act="ed-add">+ 운동 추가</button>' +
-    '<p class="ed-help">운동 옆 ▾를 누르면 종류·세트·횟수·휴식을 바꿀 수 있어요. 세트 수와 횟수 범위가 다음 목표의 기준이에요. 모든 세트가 범위 상한을 채우면 증량 단위만큼 올라가요. 맨몸 운동은 체중에 더한 가중만 적고, 유산소는 속도와 시간을 적어요. 이미 있는 운동 이름을 고르면 지난 기록이 이어져요.</p>' +
+    (state.exercises.length
+      ? '<div class="row2 ed-adds"><button class="btn dashed" type="button" id="ed-pick" data-act="ed-pick">내 운동에서 고르기</button><button class="btn dashed" type="button" id="ed-add" data-act="ed-add">+ 새 운동</button></div>'
+      : '<button class="btn block dashed" type="button" id="ed-add" data-act="ed-add">+ 운동 추가</button>') +
+    '<p class="ed-help">블록을 꾹 누른 채 끌면 순서가 바뀌어요. ▾를 누르면 이름·종류·세트·횟수·휴식을 바꿀 수 있어요. 세트 수와 횟수 범위가 다음 목표의 기준이에요. 모든 세트가 범위 상한을 채우면 증량 단위만큼 올라가요. 맨몸 운동은 체중에 더한 가중만 적고, 유산소는 속도와 시간을 적어요. 이미 있는 운동 이름을 고르면 지난 기록이 이어져요.</p>' +
     '<p class="err" id="ed-err" role="alert" hidden></p>' +
     (edit.id ? '<button class="btn block danger-line gap-top" type="button" data-act="ed-del">이 루틴 삭제</button>' : '') +
     '<datalist id="ex-names">' + state.exercises.map(x => '<option value="' + esc(x.name) + '"></option>').join('') + '</datalist></div>';
 }
 const edItem = k => edit && edit.items.find(x => x.k === k);
+/* 내 운동에서 여러 개 고르기 */
+function pickHTML() {
+  const P = edit.pick, inR = new Set(edit.items.map(it => it.exId || (exByName(it.name) || {}).id).filter(Boolean)), n = P.sel.length;
+  const groups = libGroups(state.exercises.slice());
+  return '<div class="sheet-h"><button class="btn ghost" type="button" data-act="pk-back">‹ 뒤로</button><h2 id="sheet-title">내 운동에서 고르기</h2><button class="btn primary" type="button" id="pk-ok" data-act="pk-ok"' + (n ? '' : ' disabled') + '>' + (n ? n + '개 넣기' : '넣기') + '</button></div>' +
+    '<div class="sheet-b"><input id="pk-q" class="txt pk-q" type="search" placeholder="운동 검색" autocomplete="off" aria-label="내 운동 검색" value="' + esc(P.q) + '">' +
+    groups.map(([g, list]) => '<section class="pk-g"><h3 class="sub-h">' + g + '</h3><div class="pk-list">' + list.map(ex => {
+      const has = inR.has(ex.id), on = P.sel.includes(ex.id), hide = P.q && !norm(ex.name).includes(norm(P.q));
+      return '<button type="button" class="pk-it" role="checkbox" id="pk-' + esc(ex.id) + '" aria-checked="' + on + '" data-act="pk-tg" data-id="' + esc(ex.id) + '" data-n="' + esc(norm(ex.name)) + '"' + (has ? ' disabled' : '') + (hide ? ' hidden' : '') + '>' +
+        '<span class="pk-box">' + ICON.check + '</span><span class="pk-nm">' + esc(ex.name) + '</span><span class="pk-meta">' + (has ? '루틴에 있음' : esc(planLabel(ex, exPlan(ex)))) + '</span></button>';
+    }).join('') + '</div></section>').join('') +
+    '<p class="muted pk-none" id="pk-none" hidden>찾는 운동이 없어요. 뒤로 가서 ‘+ 새 운동’으로 넣어 주세요.</p>' +
+    '<p class="ed-help">고른 순서대로 루틴 끝에 붙어요. 세트·횟수는 다른 루틴이나 지난 기록에서 쓰던 값을 가져와요.</p></div>';
+}
+function pkFilter() {
+  const q = norm(edit.pick.q || ''); let any = false;
+  document.querySelectorAll('.pk-g').forEach(g => {
+    let vis = 0;
+    g.querySelectorAll('.pk-it').forEach(b => { const ok = !q || b.dataset.n.includes(q); b.hidden = !ok; if (ok) vis++; });
+    g.hidden = !vis; if (vis) any = true;
+  });
+  const none = document.getElementById('pk-none'); if (none) none.hidden = any;
+}
+function pkToggle(t) {
+  const P = edit && edit.pick; if (!P) return;
+  const id = t.dataset.id, i = P.sel.indexOf(id);
+  if (i >= 0) P.sel.splice(i, 1); else P.sel.push(id);
+  t.setAttribute('aria-checked', String(i < 0));
+  const ok = document.getElementById('pk-ok'); if (ok) { ok.disabled = !P.sel.length; ok.textContent = P.sel.length ? P.sel.length + '개 넣기' : '넣기'; }
+}
+function pkAdd() {
+  const P = edit && edit.pick; if (!P || !P.sel.length) return;
+  const add = P.sel.map(exById).filter(Boolean).map(itemFromEx);
+  edit.items = edit.items.filter(it => String(it.name || '').trim()).concat(add);
+  edit.pick = null; refreshSheet();
+  const first = add[0] && document.querySelector('.ed-item[data-k="' + add[0].k + '"]'); if (first) first.scrollIntoView({ block: 'center' });
+  toast(add.length + '개를 넣었어요');
+}
+
+/* 루틴 편집: 블록을 꾹 눌러 끌어서 순서 바꾸기 */
+const drag = { t: 0, el: null, on: false, x0: 0, y0: 0, y: 0, grab: 0, raf: 0, pid: null, ended: 0 };
+function dragWaitCancel() { clearTimeout(drag.t); drag.t = 0; if (!drag.on) drag.el = null; }
+function dragStart() {
+  const el = drag.el; drag.t = 0;
+  if (!el || !edit || edit.pick || !document.contains(el)) { drag.el = null; return; }
+  drag.on = true; drag.grab = drag.y - el.getBoundingClientRect().top;
+  el.classList.add('dragging'); document.body.classList.add('drag-on');
+  try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) {}
+  dragPlace(); drag.raf = requestAnimationFrame(dragTick);
+}
+function flipSwap(sib, move) {
+  const before = sib.offsetTop; move(); const d = before - sib.offsetTop;
+  if (!d || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+  sib.style.transition = 'none'; sib.style.transform = 'translateY(' + d + 'px)';
+  void sib.offsetHeight;
+  sib.style.transition = 'transform .16s ease'; sib.style.transform = '';
+}
+function dragPlace() {
+  const el = drag.el, box = el && el.parentNode; if (!box) return;
+  const bt = box.getBoundingClientRect().top, want = drag.y - drag.grab, mid = want + el.offsetHeight / 2;
+  for (let g = 0; g < 60; g++) {
+    const prev = el.previousElementSibling, next = el.nextElementSibling;
+    if (next && mid > bt + next.offsetTop + next.offsetHeight / 2) flipSwap(next, () => box.insertBefore(next, el));
+    else if (prev && mid < bt + prev.offsetTop + prev.offsetHeight / 2) flipSwap(prev, () => box.insertBefore(el, prev));
+    else break;
+  }
+  el.style.transform = 'translateY(' + Math.round(want - (bt + el.offsetTop)) + 'px) scale(1.02)';
+}
+// 화면 위·아래 끝으로 끌면 시트를 스크롤
+function dragTick() {
+  if (!drag.on) return;
+  const p = document.getElementById('sheet-panel'), r = p.getBoundingClientRect(), top = r.top + 110, bot = r.bottom - 70;
+  const v = drag.y < top ? -Math.min(16, (top - drag.y) / 5) : drag.y > bot ? Math.min(16, (drag.y - bot) / 5) : 0;
+  if (v) { const s0 = p.scrollTop; p.scrollTop += v; if (p.scrollTop !== s0) dragPlace(); }
+  drag.raf = requestAnimationFrame(dragTick);
+}
+function dragEnd() {
+  const el = drag.el; cancelAnimationFrame(drag.raf);
+  drag.on = false; drag.el = null; drag.ended = Date.now();
+  document.body.classList.remove('drag-on');
+  if (!el || !edit) return;
+  const order = [...el.parentNode.children].map(x => x.dataset.k);
+  edit.items.sort((a, b) => order.indexOf(a.k) - order.indexOf(b.k));
+  refreshSheet();
+}
+document.addEventListener('pointerdown', ev => {
+  if (drag.on || drag.t || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
+  const h = ev.target.closest('[data-drag]');
+  if (!h || ev.target.closest('button') || !edit || edit.pick) return;
+  drag.el = h.closest('.ed-item'); drag.pid = ev.pointerId; drag.x0 = ev.clientX; drag.y0 = drag.y = ev.clientY;
+  drag.t = setTimeout(dragStart, ev.pointerType === 'mouse' ? 250 : 380);
+});
+document.addEventListener('pointermove', ev => {
+  if (drag.on) { if (ev.pointerId === drag.pid) { drag.y = ev.clientY; dragPlace(); } return; }
+  if (drag.t) { drag.y = ev.clientY; if (Math.abs(ev.clientX - drag.x0) > 8 || Math.abs(ev.clientY - drag.y0) > 8) dragWaitCancel(); }
+});
+['pointerup', 'pointercancel'].forEach(n => document.addEventListener(n, ev => { if (drag.on) { if (ev.pointerId === drag.pid) dragEnd(); } else if (drag.t) dragWaitCancel(); }));
+document.addEventListener('touchmove', ev => { if (drag.on) ev.preventDefault(); }, { passive: false });
+document.addEventListener('contextmenu', ev => { if (drag.on || drag.t) ev.preventDefault(); });
 function edMove(k, d) {
   const i = edit.items.findIndex(x => x.k === k), j = i + d;
   if (i < 0 || j < 0 || j >= edit.items.length) return;
@@ -2146,12 +2288,25 @@ function edNameChange(el) {
   TYPES.forEach(t => { const b = $k('t' + t[0]); if (b) b.setAttribute('aria-pressed', String(it.type === t)); });
   if (inc) { inc.value = it.inc; if (inc.parentNode.firstChild.nodeType === 3) inc.parentNode.firstChild.textContent = (bw ? '가중 단위' : '증량 단위') + ' '; }
 }
-function gcExercises() {
-  const used = new Set();
-  state.routines.forEach(r => r.items.forEach(it => used.add(it.exId)));
-  sessions().forEach(s => s.entries.forEach(e => used.add(e.exId)));
-  if (state.live) state.live.entries.forEach(e => used.add(e.exId));
-  state.exercises = state.exercises.filter(x => used.has(x.id));
+// 한 번 등록한 운동은 루틴에서 빠져도 ‘내 운동’에 남겨 둠. 지우기는 운동 설정에서 (루틴·기록에 없을 때만)
+function gcExercises() {}
+const exInRoutine = id => state.routines.some(r => r.items.some(it => it.exId === id));
+const exHasHist = id => sessions().some(s => s.entries.some(e => e.exId === id)) || !!(state.live && state.live.entries.some(e => e.exId === id));
+function libGroups(list) {
+  const by = new Map(), order = MUSCLES.map(m => m[0]).concat(['__other', '__cardio']);
+  list.forEach(ex => { const g = isCardio(ex.type) ? '__cardio' : (MLABEL[ex.m] ? ex.m : '__other'); if (!by.has(g)) by.set(g, []); by.get(g).push(ex); });
+  return order.filter(g => by.has(g)).map(g => [g === '__cardio' ? '유산소' : g === '__other' ? '기타' : MLABEL[g], by.get(g).sort((a, b) => a.name.localeCompare(b.name, 'ko'))]);
+}
+// 이 운동을 루틴에 다시 넣을 때 쓸 세트·횟수: 다른 루틴에 있던 값 → 마지막 기록의 목표 → 종류별 기본값
+function exPlan(ex) {
+  for (const r of state.routines) { const it = r.items.find(x => x.exId === ex.id); if (it) return it; }
+  for (const se of sessions()) { const e = se.entries.find(x => x.exId === ex.id && x.target); if (e) return e.target; }
+  return isCardio(ex.type) ? { sets: 1, repMin: 20, repMax: 20 } : ex.type === 'bw' ? { sets: 3, repMin: 8, repMax: 15 } : { sets: 3, repMin: 8, repMax: 12 };
+}
+const planLabel = (ex, pl) => isCardio(ex.type) ? (pl.sets > 1 ? pl.sets + '×' : '') + pl.repMin + '분' : pl.sets + '×' + pl.repMin + '–' + pl.repMax;
+function itemFromEx(ex) {
+  const pl = exPlan(ex);
+  return { k: uid(), exId: ex.id, name: ex.name, type: typeOf(ex.type), inc: ex.inc == null ? 2.5 : ex.inc, sets: pl.sets, repMin: pl.repMin, repMax: pl.repMax, m: isCardio(ex.type) ? '' : (ex.m || guessMuscles(ex.name).m || ''), rest: pl.rest || '', rir: pl.rir || '', open: false };
 }
 function edSave() {
   if (!edit) return;
@@ -2193,28 +2348,44 @@ async function edDelete() {
 
 function openXs(id) {
   const ex = exById(id); if (!ex) return;
-  ui.xs = { id, name: ex.name, type: ex.type, inc: ex.inc };
+  ui.xs = { id, name: ex.name, type: ex.type, inc: ex.inc, m: isCardio(ex.type) ? '' : (ex.m || '') };
   openSheet('xs', xsHTML());
+}
+function newXs() { ui.xs = { id: null, name: '', type: 'weight', inc: 2.5, m: '' }; openSheet('xs', xsHTML()); focusLater('xs-name'); }
+async function delXs() {
+  const x = ui.xs, ex = x && exById(x.id); if (!ex || exInRoutine(ex.id) || exHasHist(ex.id)) return;
+  if (!(await ask('‘' + ex.name + '’을(를) 내 운동에서 지울까요?', '지우기'))) return;
+  state.exercises = state.exercises.filter(o => o.id !== ex.id);
+  saveApp(); closeSheet(); render(); toast('운동을 지웠어요');
 }
 function xsHTML() {
   const x = ui.xs, bw = x.type === 'bw', ca = isCardio(x.type);
-  return '<div class="sheet-h"><button class="btn ghost" type="button" data-act="sheet-close">취소</button><h2 id="sheet-title">운동 설정</h2><button class="btn primary" type="button" data-act="xs-save">저장</button></div>' +
+  return '<div class="sheet-h"><button class="btn ghost" type="button" data-act="sheet-close">취소</button><h2 id="sheet-title">' + (x.id ? '운동 설정' : '운동 등록') + '</h2><button class="btn primary" type="button" data-act="xs-save">저장</button></div>' +
     '<div class="sheet-b srows">' +
-    '<section class="srow"><label class="lbl" for="xs-name">이름</label><input id="xs-name" class="txt" data-xs="name" value="' + esc(x.name) + '" autocomplete="off"><p>이름을 바꿔도 지난 기록은 그대로 이어져요.</p></section>' +
+    '<section class="srow"><label class="lbl" for="xs-name">이름</label><input id="xs-name" class="txt" data-xs="name" value="' + esc(x.name) + '" placeholder="예: 인클라인 덤벨 프레스" autocomplete="off"><p>' + (x.id ? '이름을 바꿔도 지난 기록은 그대로 이어져요.' : '등록해 두면 루틴을 만들 때 ‘내 운동에서 고르기’로 바로 넣을 수 있어요.') + '</p></section>' +
     '<section class="srow"><h3>종류</h3><div class="seg" role="group" aria-label="종류">' + typeSeg(x.type, t => 'id="xs-t' + t[0] + '" data-act="xs-type" data-v="' + t + '"') + '</div><p>' + (ca ? '유산소는 속도(km/h)와 시간(분)을 적고, 거리는 자동으로 계산해요.' : '맨몸 운동은 체중을 기본으로 잡고, 무게 칸에는 더한 가중(kg)만 적어요.') + '</p></section>' +
-    (ca ? '' : '<section class="srow"><label class="lbl" for="xs-inc">' + (bw ? '가중 단위' : '증량 단위') + ' (kg)</label><input id="xs-inc" class="num wide" inputmode="decimal" data-xs="inc" value="' + esc(x.inc) + '"><p>모든 세트가 범위 상한을 채웠을 때 올릴 무게예요.</p></section>') +
-    '<p class="err" id="xs-err" role="alert" hidden></p></div>';
+    (ca ? '' : '<section class="srow"><label class="lbl" for="xs-inc">' + (bw ? '가중 단위' : '증량 단위') + ' (kg)</label><input id="xs-inc" class="num wide" inputmode="decimal" data-xs="inc" value="' + esc(x.inc) + '"><p>모든 세트가 범위 상한을 채웠을 때 올릴 무게예요.</p></section>' +
+      '<section class="srow"><label class="lbl" for="xs-m">주 근육</label><select id="xs-m" class="sel" data-xs="m"><option value="">모름</option>' + MUSCLES.map(([mk, ml]) => '<option value="' + mk + '"' + (x.m === mk ? ' selected' : '') + '>' + ml + '</option>').join('') + '</select><p>내 운동 목록을 근육별로 묶고, 코치의 근육별 세트 계산에 써요.</p></section>') +
+    '<p class="err" id="xs-err" role="alert" hidden></p>' +
+    (x.id ? (exInRoutine(x.id) || exHasHist(x.id)
+      ? '<p class="muted">' + (exInRoutine(x.id) ? '루틴에 들어 있는 운동이라 지울 수 없어요.' : '기록이 있는 운동은 성장 그래프와 다음 목표 계산을 위해 남겨 둬요.') + '</p>'
+      : '<button class="btn block danger-line" type="button" data-act="xs-del">내 운동에서 지우기</button>') : '') + '</div>';
 }
 function saveXs() {
   const x = ui.xs; if (!x) return;
-  const ex = exById(x.id); if (!ex) { closeSheet(); return; }
+  let ex = x.id ? exById(x.id) : null; if (x.id && !ex) { closeSheet(); return; }
   const nm = String(x.name || '').trim().replace(/\s+/g, ' '), err = document.getElementById('xs-err');
   if (!nm) { err.textContent = '이름을 입력해 주세요.'; err.hidden = false; return; }
-  if (state.exercises.some(o => o.id !== ex.id && norm(o.name) === norm(nm))) { err.textContent = '같은 이름의 운동이 이미 있어요.'; err.hidden = false; return; }
+  if (state.exercises.some(o => (!ex || o.id !== ex.id) && norm(o.name) === norm(nm))) { err.textContent = '같은 이름의 운동이 이미 있어요.'; err.hidden = false; return; }
+  const isNew = !ex; if (isNew) { ex = { id: uid(), name: nm, type: 'weight', inc: 2.5, m: null, s: [] }; state.exercises.push(ex); }
   const n = num(x.inc);
   ex.name = nm; ex.type = typeOf(x.type); ex.inc = isCardio(ex.type) ? 0 : Math.min(100, Math.max(0, r2(n == null ? ex.inc : n)));
   if (isCardio(ex.type)) { ex.m = null; ex.s = []; }
-  saveApp(); closeSheet(); render(); toast('운동 설정을 바꿨어요');
+  else {
+    const m = MLABEL[x.m] ? x.m : (isNew ? guessMuscles(nm).m || null : null);
+    if (m !== (ex.m || null) && (m || x.m === '')) { const g = guessMuscles(nm); ex.m = m; ex.s = m && g.m === m ? g.s.slice() : []; }
+  }
+  saveApp(); closeSheet(); render(); toast(isNew ? '‘' + nm + '’을(를) 내 운동에 등록했어요' : '운동 설정을 바꿨어요');
 }
 
 /* ── 백업 ─────────────────────────────────────── */
@@ -2860,6 +3031,7 @@ function shiftPday(n) {
 document.addEventListener('click', ev => {
   const t = ev.target.closest('[data-act],[data-tab]');
   if (!t || t.disabled) return;
+  if (Date.now() - drag.ended < 250 && t.closest('.ed-item')) return;   // 끌어서 놓은 직후의 클릭은 무시
   if (t.dataset.tab) { switchTab(t.dataset.tab); return; }
   const a = t.dataset.act, e = +t.dataset.e, s = +t.dataset.s, id = t.dataset.id, k = t.dataset.k, v = t.dataset.v;
   switch (a) {
@@ -2883,7 +3055,19 @@ document.addEventListener('click', ev => {
     case 'preset-add': addPresets(); break;
     case 'edit': openEditor(id); break;
     case 'ed-type': { const it = edItem(k); if (it) { edSetType(it, v); refreshSheet(); } break; }
-    case 'ed-tg': { const it = edItem(k); if (it) { it.open = !it.open; t.setAttribute('aria-expanded', String(it.open)); const d = document.getElementById('ed-' + k + '-d'); if (d) d.hidden = !it.open; } break; }
+    case 'ed-tg': {
+      const it = edItem(k); if (!it) break;
+      it.open = !it.open;
+      const b = document.getElementById('ed-' + k + '-tg'), d = document.getElementById('ed-' + k + '-d'), box = d && d.closest('.ed-item');
+      if (b) b.setAttribute('aria-expanded', String(it.open)); if (d) d.hidden = !it.open; if (box) box.classList.toggle('open', it.open);
+      break;
+    }
+    case 'ed-pick': if (edit) { edit.pick = { sel: [], q: '' }; refreshSheet(); document.getElementById('sheet-panel').scrollTop = 0; } break;
+    case 'pk-tg': pkToggle(t); break;
+    case 'pk-ok': pkAdd(); break;
+    case 'pk-back': if (edit) { edit.pick = null; refreshSheet(); } break;
+    case 'xs-new': newXs(); break;
+    case 'xs-del': delXs(); break;
     case 'pl-tg': plToggle(t); break;
     case 'rt-tg': { const open = !ui.rtOpen.has(id); if (open) ui.rtOpen.add(id); else ui.rtOpen.delete(id); t.setAttribute('aria-expanded', String(open)); const d = document.getElementById(t.getAttribute('aria-controls')); if (d) d.hidden = !open; break; }
     case 'ed-up': edMove(k, -1); break;
@@ -2945,12 +3129,16 @@ document.addEventListener('input', ev => {
   if (el.dataset.f && el.closest('#main')) onSetInput(el);
   else if (el.dataset.ed && edit) {
     if (el.dataset.ed === 'name') edit.name = el.value;
-    else { const it = edItem(el.dataset.k); if (it) it[el.dataset.ed === 'iname' ? 'name' : el.dataset.ed] = el.value; }
+    else {
+      const it = edItem(el.dataset.k); if (it) it[el.dataset.ed === 'iname' ? 'name' : el.dataset.ed] = el.value;
+      if (it && el.dataset.ed === 'iname') { const l = document.getElementById('ed-' + it.k + '-nm'), v = el.value.trim(); if (l) { l.textContent = v || '새 운동'; l.classList.toggle('ph', !v); } }
+    }
   }
   else if (el.dataset.xs && ui.xs) ui.xs[el.dataset.xs] = el.value;
   else if (el.dataset.bf && ui.bd) ui.bd[el.dataset.bf] = el.value;
   else if (el.id === 'addex-name') ui.addExName = el.value;
   else if (el.id === 'p-search') { ui.pq = el.value; ui.pmore = false; renderFoodList(); }
+  else if (el.id === 'pk-q' && edit && edit.pick) { edit.pick.q = el.value; pkFilter(); }
   else if (el.dataset.pa && ui.pa) { ui.pa[el.dataset.pa] = el.value; amtSync(); }
   else if (el.dataset.pc && ui.pc) ui.pc[el.dataset.pc] = el.value;
   else if (el.dataset.pk && ui.pk) ui.pk[el.dataset.pk] = el.value;
@@ -2971,7 +3159,7 @@ document.addEventListener('keydown', ev => {
   if (ev.key === 'Escape' && !document.getElementById('sheet').hidden && document.getElementById('dialog').hidden) { ev.preventDefault(); closeSheet(); return; }
   if (ev.key !== 'Enter' || ev.isComposing) return;
   if (t.id === 'addex-name') { ev.preventDefault(); addExToSession(); }
-  else if (t.id === 'p-search') { ev.preventDefault(); t.blur(); }
+  else if (t.id === 'p-search' || t.id === 'pk-q') { ev.preventDefault(); t.blur(); }
   else if (t.id === 'pa-amt') { ev.preventDefault(); saveAmt(); }
   else if (t.id === 'pk-p' || t.id === 'pk-n') { ev.preventDefault(); saveQuick(); }
   else if (t.id === 'pc-p') { ev.preventDefault(); saveCustom(); }
@@ -2997,7 +3185,7 @@ boot();
 
 <script>
 // 오프라인 사용을 위한 서비스 워커와, 기기 저장 공간이 지워지지 않도록 요청
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=4dc4eb7408').catch(() => {}));
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=19aed4a146').catch(() => {}));
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 </script>
 </body>
