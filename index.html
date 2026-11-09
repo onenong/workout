@@ -655,6 +655,17 @@ const DAY = 864e5, WEEK = 7 * DAY;
 const MUSCLES = [['chest', '가슴'], ['back', '등'], ['shoulders', '어깨'], ['biceps', '이두'], ['triceps', '삼두'], ['quads', '앞허벅지'], ['posterior', '엉덩이·뒤허벅지'], ['calves', '종아리'], ['core', '코어']];
 const MLABEL = Object.fromEntries(MUSCLES);
 const DEFAULT_PROFILE = { age: null, height: null };
+// 저장소·백업 파일에서 읽은 프로필은 믿지 않고 숫자 범위로만 받는다 (XSS 방지)
+function sanitizeProfile(p) {
+  const src = p && typeof p === 'object' ? p : {};
+  const pick = (v, lo, hi) => { const n = num(v); return n != null && n >= lo && n <= hi ? n : null; };
+  const age = pick(src.age, 10, 100), height = pick(src.height, 100, 250);
+  return {
+    age: age == null ? null : Math.round(age),
+    height: height == null ? null : Math.round(height * 10) / 10,
+    limits: Array.isArray(src.limits) ? src.limits.filter(x => typeof x === 'string').map(x => x.slice(0, 60)).slice(0, 20) : []
+  };
+}
 const REF_SETS = 10, HIGH_SETS = 20, MAX_EX_SETS = 6;   // 근육당 주 10세트 참고선 [1] · 이미 많은 주간 볼륨 · 운동당 세트 상한
 const mLabel = m => MLABEL[m] || '기타';
 const GUESS = [
@@ -1197,8 +1208,7 @@ function applyData(d) {
   state.routines = Array.isArray(d.routines) ? clone(d.routines) : [];
   state.routines.forEach(r => { if (r) delete r.coach; });
   state.settings = Object.assign({}, DEFAULT_SETTINGS, d.settings ? clone(d.settings) : {});
-  state.profile = Object.assign(clone(DEFAULT_PROFILE), d.profile && typeof d.profile === 'object' ? clone(d.profile) : {});
-  if (!Array.isArray(state.profile.limits)) state.profile.limits = [];
+  state.profile = sanitizeProfile(d.profile);
   state.body = Array.isArray(d.body) ? clone(d.body).filter(b => b && Number.isFinite(b.at)) : [];
   state.coach = coachFrom(d.coach || d.program);
   state.nutri = Object.assign(clone(DEFAULT_NUTRI), d.nutri && typeof d.nutri === 'object' ? clone(d.nutri) : {});
@@ -2521,8 +2531,7 @@ function sanitizeImport(d) {
   }));
   exercises.forEach((x, i) => { const src = d.exercises.find(e => e && String(e.id) === x.id) || {}; if (MLABEL[src.m]) { x.m = src.m; x.s = (Array.isArray(src.s) ? src.s : []).filter(z => MLABEL[z]); } });
   const st = d.settings || {};
-  const pf = Object.assign(clone(DEFAULT_PROFILE), d.profile && typeof d.profile === 'object' ? clone(d.profile) : {});
-  if (!Array.isArray(pf.limits)) pf.limits = [];
+  const pf = sanitizeProfile(d.profile);
   const body = (Array.isArray(d.body) ? d.body : []).filter(b => b && Number.isFinite(b.at)).map(b => ({ id: String(b.id || uid()), at: b.at, w: num(b.w), bf: num(b.bf), smm: num(b.smm) }));
   return { exercises, routines, settings: { rest: REST_OPTS.includes(+st.rest) ? +st.rest : 90, sound: st.sound !== false }, profile: pf, body, coach: coachFrom(d.coach || d.program), nutri: sanitizeNutri(d.nutri), protein: sanitizeProtein(d.protein), sessions: list };
 }
@@ -2693,7 +2702,7 @@ function bodyCard() {
   const PT = proteinTarget();
   if (PT) d.push('<span>단백질 하루 <b>' + PT.g + '</b>g' + (PT.manual ? ' (직접 정함)' : refs([9, 11])) + '</span>');
   if (pf.height) d.push('<span>키 <b>' + fmtN(pf.height) + '</b>cm</span>'); else d.push('<span>키를 입력하면 BMI·FFMI도 계산해요</span>');
-  if (pf.age) d.push('<span>나이 <b>' + pf.age + '</b></span>');
+  if (pf.age) d.push('<span>나이 <b>' + esc(pf.age) + '</b></span>');
   const notes = bodyNotes();
   return h + '<section class="card body-card"><div class="kv">' + tile('몸무게', 'w', 'kg') + tile('체지방률', 'bf', '%') + tile('골격근량', 'smm', 'kg') + '</div>' +
     '<p class="derived">' + d.join('') + '</p>' +
