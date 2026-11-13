@@ -825,26 +825,43 @@ function viewSession() {
   return h;
 }
 const wVal = (s, e) => (s.w == null || ((e.type === 'bw' || isCardio(e.type)) && !s.w)) ? '' : fmtN(s.w);
+// 이 운동의 가장 최근 기록 (지금 하는 운동은 아직 저장 전이라 안 섞임)
+const prevOf = e => hist(e.exId)[0] || null;
 function exCard(e, i) {
-  const name = exName(e.exId, e.name), bw = e.type === 'bw';
+  const name = exName(e.exId, e.name), bw = e.type === 'bw', P = prevOf(e);
   const allDone = e.sets.length > 0 && e.sets.every(s => s.done);
-  return '<section class="card ex" aria-label="' + esc(name) + '">' +
+  return '<section class="card ex' + (P ? ' hp' : '') + '" aria-label="' + esc(name) + '">' +
     '<header class="ex-h"><div class="ex-t"><h3>' + esc(name) + (allDone ? '<span class="pill">완료</span>' : '') + '</h3></div>' +
     '<button class="icon-btn sm ghost" type="button" data-act="rmex" data-e="' + i + '" aria-label="' + esc(name) + ' 오늘 운동에서 빼기">' + ICON.x + '</button></header>' +
-    '<div class="set-head" aria-hidden="true">' + setHead(e) + '</div>' +
-    '<div class="sets">' + e.sets.map((s, j) => setRow(e, i, s, j)).join('') + '</div>' +
+    '<div class="set-head" aria-hidden="true">' + setHead(e, P) + '</div>' +
+    '<div class="sets">' + e.sets.map((s, j) => setRow(e, i, s, j, P)).join('') + '</div>' +
     '<div class="ex-foot"><button class="btn sm" type="button" data-act="addset" data-e="' + i + '">+ ' + (isCardio(e.type) ? '구간' : '세트') + '</button><button class="btn sm ghost" type="button" data-act="delset" data-e="' + i + '"' + (e.sets.length ? '' : ' disabled') + '>− ' + (isCardio(e.type) ? '구간' : '세트') + '</button></div>' +
     '</section>';
 }
-function setHead(e) {
-  const L = state.live, bwKg = L ? bodyW(L.start) : null;
-  if (isCardio(e.type)) return '<span>구간</span><span>속도 km/h</span><span>시간</span><span>완료</span>';
-  if (e.type === 'bw') return '<span>세트</span><span>' + (bwKg ? '체중 ' + fmtN(bwKg) + ' + kg' : '가중 kg') + '</span><span>횟수</span><span>완료</span>';
-  return '<span>세트</span><span>무게 kg</span><span>횟수</span><span>완료</span>';
+function setHead(e, P) {
+  const L = state.live, bwKg = L ? bodyW(L.start) : null, pv = P ? '<span>지난번</span>' : '';
+  if (isCardio(e.type)) return '<span>구간</span>' + pv + '<span>속도 km/h</span><span>시간</span><span>완료</span>';
+  if (e.type === 'bw') return '<span>세트</span>' + pv + '<span>' + (bwKg ? '체중 ' + fmtN(bwKg) + ' + kg' : '가중 kg') + '</span><span>횟수</span><span>완료</span>';
+  return '<span>세트</span>' + pv + '<span>무게 kg</span><span>횟수</span><span>완료</span>';
 }
-function setRow(e, i, s, j) {
+function prevCell(e, i, j, P) {
+  const p = P && P.sets[j];
+  if (!p) return '<span class="prev none" aria-hidden="true">—</span>';
+  const ca = isCardio(e.type), bw = e.type === 'bw';
+  const top = ca ? fmtN(p.w || 0) + 'km/h' : bw ? (p.w ? '+' + fmtN(p.w) + 'kg' : '체중') : fmtN(p.w || 0) + 'kg', bot = p.r + (ca ? '분' : '회');
+  return '<button type="button" class="prev" id="p-' + i + '-' + j + '" data-act="use-prev" data-e="' + i + '" data-s="' + j + '" aria-label="' + (j + 1) + '세트 지난번 ' + top + ' ' + bot + ' (' + md(P.start) + '), 눌러서 그대로 채우기">' +
+    '<b>' + top + '</b><span>' + bot + '</span></button>';
+}
+// 지난번 칸을 누르면 그 세트의 무게·횟수를 그대로 채움
+function usePrev(ei, si) {
+  const L = state.live, e = L && L.entries[ei], s = e && e.sets[si], P = e && prevOf(e), p = P && P.sets[si];
+  if (!s || !p || s.done) return;
+  s.w = p.w == null ? s.w : p.w; s.r = p.r;
+  saveLive(); render();
+}
+function setRow(e, i, s, j, P) {
   const id = i + '-' + j, bw = e.type === 'bw', ca = isCardio(e.type), wv = wVal(s, e);
-  return '<div class="set' + (s.done ? ' done' : '') + '"><span class="no">' + (j + 1) + '</span>' +
+  return '<div class="set' + (s.done ? ' done' : '') + '"><span class="no">' + (j + 1) + '</span>' + (P ? prevCell(e, i, j, P) : '') +
     '<div class="field' + (ca ? ' wide-u' : '') + '"><input id="w-' + id + '" data-f="w" data-e="' + i + '" data-s="' + j + '" data-prev="' + esc(wv) + '" type="text" inputmode="decimal" enterkeyhint="next" autocomplete="off" value="' + esc(wv) + '" placeholder="' + (bw ? '0' : '—') + '" aria-label="' + (j + 1) + (ca ? '구간 속도 km/h' : '세트 ' + (bw ? '체중에 더한 가중' : '무게') + ' kg') + '"><span class="u">' + (ca ? 'km/h' : bw ? '+kg' : 'kg') + '</span></div>' +
     '<div class="field"><input id="r-' + id + '" data-f="r" data-e="' + i + '" data-s="' + j + '" type="text" inputmode="numeric" enterkeyhint="done" autocomplete="off" value="' + (s.r == null ? '' : s.r) + '" placeholder="' + (s.tr || '') + '" aria-label="' + (j + 1) + (ca ? '구간 시간, 목표 ' + (s.tr || '') + '분' : '세트 횟수, 목표 ' + (s.tr || '') + '회') + '"><span class="u">' + (ca ? '분' : '회') + '</span></div>' +
     '<button class="chk" type="button" id="c-' + id + '" data-act="done" data-e="' + i + '" data-s="' + j + '" aria-pressed="' + !!s.done + '" aria-label="' + (j + 1) + '세트 완료">' + ICON.check + '</button></div>';
@@ -2514,6 +2531,7 @@ document.addEventListener('click', ev => {
     case 'start': startRoutine(id); break;
     case 'start-free': startFree(); break;
     case 'done': toggleDone(e, s); break;
+    case 'use-prev': usePrev(e, s); break;
     case 'addset': addSet(e); break;
     case 'delset': delSet(e); break;
     case 'rmex': rmEx(e); break;
@@ -2658,5 +2676,5 @@ boot();
 })();
 
 // 오프라인 사용을 위한 서비스 워커와, 기기 저장 공간이 지워지지 않도록 요청
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=1846203300').catch(() => {}));
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js?v=2621667211').catch(() => {}));
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});

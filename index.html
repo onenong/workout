@@ -223,6 +223,18 @@ body.has-rest main.wrap{padding-bottom:calc(var(--tabbar-h) + 112px)}
 .set.done .no{color:var(--ok)}
 .set.done .field input{background:transparent}
 .set.done .chk{background:var(--ok);border-color:var(--ok);color:var(--on-ok)}
+.ex.hp .set-head,.ex.hp .set{grid-template-columns:26px 54px minmax(0,1fr) minmax(0,1fr) 46px;gap:6px}
+/* 지난번 칸이 있을 땐 단위는 위 머리글(무게 kg·횟수)에만 두고 숫자 칸을 넓게 */
+.ex.hp .field input{padding:0 8px 0 10px;font-size:21px}
+.ex.hp .field .u,.ex.hp .field.wide-u .u{display:none}
+.ex.hp .field.wide-u input{padding-right:8px}
+.ex.hp .set-head span:nth-child(2){text-align:center}
+.prev{appearance:none;display:grid;justify-items:center;align-content:center;gap:1px;height:46px;min-width:0;padding:0 2px;border:1px dashed var(--line);border-radius:10px;background:none;color:var(--ink-2);font:600 12px/1.15 var(--f-num);font-variant-numeric:tabular-nums;cursor:pointer;-webkit-tap-highlight-color:transparent;overflow:hidden}
+.prev b{font-weight:700;color:var(--ink);white-space:nowrap}
+.prev span{white-space:nowrap}
+.prev:active{background:var(--sunk)}
+.prev.none{border-color:transparent;color:var(--ink-3);cursor:default;font-size:14px}
+.set.done .prev{border-color:transparent}
 .ex-foot{display:flex;gap:6px;margin-top:10px;padding:0 4px}
 .addex{margin-top:12px;padding:14px;display:grid;gap:10px}
 .lbl{display:block;font-size:12.5px;font-weight:600;color:var(--ink-2)}
@@ -590,7 +602,7 @@ button.notice{cursor:pointer}
 <div class="scrim" id="dialog" hidden></div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="app.js?v=1846203300"></script>
+<script src="app.js?v=2621667211"></script>
 
 </body>
 </html>

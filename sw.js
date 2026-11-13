@@ -1,5 +1,5 @@
-// WORKOUT 서비스 워커 · 1846203300
-const SHELL = 'overload-shell-1846203300', FONTS = 'overload-fonts-v2';
+// WORKOUT 서비스 워커 · 2621667211
+const SHELL = 'overload-shell-2621667211', FONTS = 'overload-fonts-v2';
 const ASSETS = ['./', './index.html', './app.js', './fonts/fonts.css', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(SHELL).then(c => Promise.all(ASSETS.map(a => c.add(a).catch(() => {}))) ).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
